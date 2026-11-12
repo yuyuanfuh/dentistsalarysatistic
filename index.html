@@ -434,6 +434,18 @@
 }
 #form-insurance > *{flex-shrink:0;}
 #form-insurance > .qgrid{flex-shrink:1;}
+.keypad.compact{gap:6px; margin-bottom:10px;}
+.keypad.compact button{min-height:46px; font-size:21px;}
+.keypad.compact .k-fn{font-size:14px;}
+.keypad.hidden{display:none;}
+.code-row .cname{flex:1; min-width:0; word-break:break-word;}
+.code-row .cpts{flex-shrink:0;}
+@media (max-width:767.98px){
+  .code-row{gap:6px; padding:8px 0;}
+  .code-row .code{width:60px; font-size:12.5px;}
+  .code-row .cpts{width:46px; font-size:13px;}
+  .code-row .icon-btn{min-width:32px; min-height:40px;}
+}
 
 </style>
 </head>
@@ -612,7 +624,16 @@
       </div>
       <div class="ver-note" id="codeVerNote"></div>
       <p class="hint" style="margin-bottom:10px;">健保局調整支付點數時，點 ✎ 直接修改點數即可；新增或刪除項目也在這裡操作。已存的紀錄保留當時的點數，不受影響。</p>
-      <input type="text" id="codeSearch" placeholder="搜尋代碼或名稱…" style="margin-bottom:10px;" autocomplete="off">
+      <div class="coderow" style="margin-bottom:8px;">
+        <input type="text" id="codeSearch" class="code-display" inputmode="none" placeholder="用按鈕輸入代碼" autocomplete="off" autocapitalize="characters" spellcheck="false" aria-label="搜尋代碼">
+        <button type="button" id="codeKpToggle" class="note-btn" aria-label="顯示或收起數字鍵">收起</button>
+      </div>
+      <div class="keypad compact" id="codeKeypad">
+        <button type="button" data-k="7">7</button><button type="button" data-k="8">8</button><button type="button" data-k="9">9</button><button type="button" data-k="bs" class="k-fn" aria-label="倒退">⌫</button>
+        <button type="button" data-k="4">4</button><button type="button" data-k="5">5</button><button type="button" data-k="6">6</button><button type="button" data-k="P" class="k-letter">P</button>
+        <button type="button" data-k="1">1</button><button type="button" data-k="2">2</button><button type="button" data-k="3">3</button><button type="button" data-k="C" class="k-letter">C</button>
+        <button type="button" data-k="clr" class="k-fn">清除</button><button type="button" data-k="0">0</button><button type="button" data-k="txt" id="codeKeyTxt" class="k-fn">名稱</button><button type="button" data-k="hide" class="k-fn">收起</button>
+      </div>
       <div class="chips" id="codeCatChips"></div>
       <div class="chips" id="codeSubChips"></div>
       <div id="codeList"></div>
@@ -1710,22 +1731,49 @@
     $('#codeSubChips').innerHTML = codeFilter === 'other'
       ? [['all', '全部'], ...Object.entries(SUBS)].map(([k, l]) => `<button type="button" class="chip ${k === codeSubFilter ? 'active' : ''}" data-sub="${k}">${l}</button>`).join('') : '';
     const q = $('#codeSearch').value.trim().toLowerCase();
-    let list = state.codes.filter(c => (codeFilter === 'all' || c.cat === codeFilter) && (codeFilter !== 'other' || codeSubFilter === 'all' || c.sub === codeSubFilter) && matchCode(c, q));
+    let list = state.codes.filter(c => (codeFilter === 'all' || c.cat === codeFilter) && (codeFilter !== 'other' || codeSubFilter === 'all' || c.sub === codeSubFilter) && (!q ? true : codeLike(q) ? c.code.toLowerCase().startsWith(q) : matchCode(c, q)));
     list.sort((a, b) => a.code.localeCompare(b.code));
     $('#codeVerNote').textContent = `代碼表版本：${CODES_VERSION_LABEL}・目前共 ${state.codes.length} 項` + (list.length !== state.codes.length ? `（顯示 ${list.length} 項）` : '');
     $('#codeList').innerHTML = list.length ? list.map(c => {
       const cat = CATS[c.cat] || CATS.other;
       return `<div class="code-row" data-code="${esc(c.code)}">
         <span class="code">${esc(c.code)}</span>
-        <span class="cname">${esc(c.name)}${c.sub ? `<span class="sub-tag">${esc(SUBS[c.sub] || c.sub)}</span>` : ''}</span>
+        <span class="cname">${esc(c.name)}<span class="badge ${cat.cls}" style="margin-left:6px;">${cat.label}</span>${c.sub ? `<span class="sub-tag">${esc(SUBS[c.sub] || c.sub)}</span>` : ''}</span>
         <span class="cpts mono">${esc(c.points)}</span>
-        <span class="badge ${cat.cls}">${cat.label}</span>
         <button type="button" class="icon-btn" data-act="edit" aria-label="編輯代碼">✎</button>
         <button type="button" class="icon-btn" data-act="del" aria-label="刪除代碼">🗑</button>
       </div>`;
     }).join('') : '<div class="empty-state">沒有符合的代碼</div>';
   }
   $('#codeSearch').addEventListener('input', renderCodes);
+  const codeSearch = $('#codeSearch');
+  let codeTextMode = false;
+  function setCodeKeypad(show){
+    $('#codeKeypad').classList.toggle('hidden', !show);
+    $('#codeKpToggle').textContent = show ? '收起' : '鍵盤';
+    if(!show && !codeTextMode) codeSearch.blur();
+  }
+  $('#codeKpToggle').addEventListener('click', () => setCodeKeypad($('#codeKeypad').classList.contains('hidden')));
+  $('#codeKeypad').addEventListener('click', e => {
+    const btn = e.target.closest('button[data-k]');
+    if(!btn) return;
+    const k = btn.dataset.k;
+    if(k === 'hide'){ setCodeKeypad(false); return; }
+    if(k === 'txt'){
+      codeTextMode = !codeTextMode;
+      codeSearch.inputMode = codeTextMode ? 'text' : 'none';
+      codeSearch.placeholder = codeTextMode ? '輸入代碼或名稱，例如 洗牙、根管' : '用按鈕輸入代碼';
+      $('#codeKeyTxt').textContent = codeTextMode ? '數字' : '名稱';
+      if(codeTextMode) codeSearch.focus(); else codeSearch.blur();
+      return;
+    }
+    let v = codeSearch.value;
+    if(k === 'bs') v = v.slice(0, -1);
+    else if(k === 'clr') v = '';
+    else v += k;
+    codeSearch.value = v;
+    renderCodes();
+  });
   $('#codeCatChips').addEventListener('click', e => { const b = e.target.closest('[data-cat]'); if(b){ codeFilter = b.dataset.cat; codeSubFilter = 'all'; renderCodes(); } });
   $('#codeSubChips').addEventListener('click', e => { const b = e.target.closest('[data-sub]'); if(b){ codeSubFilter = b.dataset.sub; renderCodes(); } });
 
