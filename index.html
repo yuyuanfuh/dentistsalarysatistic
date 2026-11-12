@@ -340,7 +340,6 @@
     #view-add > #addNoClinic{grid-column:1 / -1;}
     .add-side{margin-top:0; position:sticky; top:24px;}
     .picker-list{max-height:calc(100vh - 380px); min-height:200px;}
-    #insSuggest{display:none !important;}
 
     #view-clinics.active{display:grid; grid-template-columns:1fr 1fr; gap:24px; align-items:start;}
     #view-clinics .card + .card{margin-top:0;}
@@ -356,6 +355,47 @@
     .grid-3{grid-template-columns:1fr;}
     .brand-t .sub{display:none;}
   }
+
+/* ================= v3.1 數字鍵盤輸入 ================= */
+.codebox{margin-bottom:10px;}
+.code-display{font-family:'IBM Plex Mono',monospace; font-size:22px !important; font-weight:600; letter-spacing:.04em; min-height:56px !important; text-transform:uppercase; border:2px solid var(--line) !important; text-overflow:ellipsis;}
+.code-display:focus{border-color:var(--teal) !important; outline:none;}
+.codebox .suggest{position:static; box-shadow:none; max-height:190px; margin-top:6px;}
+.sel-info{min-height:26px; margin-top:6px; font-size:14px; color:var(--ink-soft); display:flex; align-items:center; gap:6px; flex-wrap:wrap;}
+.sel-info b{color:var(--ink); font-family:'IBM Plex Mono',monospace;}
+.qcats,.qsubs{margin-bottom:8px; flex-wrap:nowrap; overflow-x:auto; scrollbar-width:none;}
+.qcats::-webkit-scrollbar,.qsubs::-webkit-scrollbar{display:none;}
+.qcats .chip,.qsubs .chip{flex-shrink:0; white-space:nowrap;}
+.qsubs:empty{display:none;}
+.qgrid{display:grid; grid-template-columns:1fr 1fr; gap:6px; max-height:260px; overflow-y:auto; padding:2px; margin-bottom:12px; -webkit-overflow-scrolling:touch;}
+.qbtn{display:flex; flex-direction:column; justify-content:space-between; gap:4px; text-align:left; min-height:62px; padding:8px 10px; border:1px solid var(--line); border-left:4px solid var(--gray); border-radius:10px; background:#fff; cursor:pointer; color:var(--ink);}
+.qbtn:active{background:var(--teal-soft);}
+.qbtn.selected{border-color:var(--teal); background:var(--teal-soft);}
+.qn{font-size:13.5px; line-height:1.3; font-weight:600; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;}
+.qm{display:flex; justify-content:space-between; gap:6px; font-family:'IBM Plex Mono',monospace; font-size:12px;}
+.qcode{color:var(--teal); font-weight:600;}
+.qpts{color:var(--ink-soft);}
+.qtyrow{display:grid; grid-template-columns:minmax(0,1.3fr) minmax(0,1fr); gap:10px; align-items:stretch; margin-bottom:12px;}
+.qtyrow:has(> .qprev:only-child){grid-template-columns:1fr;}
+.qprev{display:flex; flex-direction:column; justify-content:center; padding:6px 12px; background:var(--teal-soft); border-radius:10px; min-height:46px;}
+.qprev span{font-size:11.5px; color:var(--ink-soft); font-weight:700;}
+.qprev b{font-size:20px; color:var(--teal);}
+.keypad{display:grid; grid-template-columns:repeat(4,1fr); gap:8px; margin-bottom:12px; user-select:none; -webkit-user-select:none; touch-action:manipulation;}
+.keypad button{min-height:58px; border:1px solid var(--line); border-radius:14px; background:#fff; font-size:24px; font-weight:600; color:var(--ink); cursor:pointer; font-family:'IBM Plex Mono',monospace;}
+.keypad button:active{background:var(--gray-soft); transform:scale(.97);}
+.keypad .k-fn{font-family:inherit; font-size:15px; background:var(--gray-soft); color:var(--ink-soft);}
+.keypad .k-letter{background:var(--teal-soft); color:var(--teal);}
+.keypad .k-save{font-family:inherit; font-size:17px; background:var(--teal); color:#fff; border-color:var(--teal);}
+.keypad .k-save:active{background:#0b5547;}
+@media (min-width:768px){
+  .qgrid{grid-template-columns:repeat(3,1fr); max-height:300px;}
+  .keypad button{min-height:64px;}
+  .qn{font-size:14px;}
+}
+@media (min-width:1024px){
+  #view-add.active{grid-template-columns:minmax(440px,600px) minmax(0,1fr);}
+  .qgrid{max-height:340px;}
+}
 
 </style>
 </head>
@@ -476,25 +516,31 @@
             <label for="insDate">日期</label>
             <input type="date" id="insDate">
           </div>
-          <div class="field search-box">
-            <label for="insCodeSearch">申報代碼／項目名稱</label>
-            <input type="text" id="insCodeSearch" placeholder="輸入代碼或名稱，例如 91004、洗牙、根管" autocomplete="off" autocapitalize="off" spellcheck="false">
+          <input type="hidden" id="insPointValue"><input type="hidden" id="insCommission">
+
+          <div class="codebox">
+            <input type="text" id="insCodeSearch" class="code-display" inputmode="none" placeholder="用下方按鈕輸入代碼" autocomplete="off" autocapitalize="characters" spellcheck="false" aria-label="申報代碼">
             <div class="suggest" id="insSuggest" style="display:none;"></div>
+            <div id="insSelectedInfo" class="sel-info"></div>
           </div>
-          <div class="freq" id="freqChips"></div>
-          <div id="insSelectedInfo" class="hint" style="margin-bottom:12px;"></div>
-          <div class="row">
-            <div class="field"><label for="insQty">數量／件數</label>
-              <div class="stepper"><button type="button" data-step="-1" aria-label="減少">−</button><input type="number" id="insQty" value="1" min="1" step="1" inputmode="numeric"><button type="button" data-step="1" aria-label="增加">＋</button></div>
-            </div>
-            <div class="field"><label for="insPointValue">點值（1點＝？元）</label><input type="number" id="insPointValue" step="0.01" inputmode="decimal"></div>
+
+          <div class="chips qcats" id="qCats"></div>
+          <div class="chips qsubs" id="qSubs"></div>
+          <div class="qgrid" id="qGrid"></div>
+
+          <div class="qtyrow">
+            <div class="stepper"><button type="button" data-step="-1" aria-label="減少">−</button><input type="number" id="insQty" value="1" min="1" step="1" inputmode="numeric" aria-label="數量"><button type="button" data-step="1" aria-label="增加">＋</button></div>
+            <div class="qprev"><span>預估收入</span><b class="mono" id="insPreview">$0</b></div>
           </div>
-          <div class="row">
-            <div class="field"><label for="insCommission">抽成比例（％）</label><input type="number" id="insCommission" step="0.1" inputmode="decimal"></div>
-            <div class="field"><label>&nbsp;</label><div class="stat" style="padding:9px 12px;"><div class="label">預估收入</div><div class="value mono" id="insPreview" style="font-size:18px;">$0</div></div></div>
+
+          <div class="keypad" id="keypad">
+            <button type="button" data-k="7">7</button><button type="button" data-k="8">8</button><button type="button" data-k="9">9</button><button type="button" data-k="bs" class="k-fn" aria-label="倒退">⌫</button>
+            <button type="button" data-k="4">4</button><button type="button" data-k="5">5</button><button type="button" data-k="6">6</button><button type="button" data-k="P" class="k-letter">P</button>
+            <button type="button" data-k="1">1</button><button type="button" data-k="2">2</button><button type="button" data-k="3">3</button><button type="button" data-k="C" class="k-letter">C</button>
+            <button type="button" data-k="clr" class="k-fn">清除</button><button type="button" data-k="0">0</button><button type="button" data-k="txt" id="keyTxt" class="k-fn">名稱</button><button type="button" id="insSave" class="k-save">儲存</button>
           </div>
-          <div class="field"><label for="insNote">備註（選填）</label><input type="text" id="insNote" placeholder="病人代號、備註…"></div>
-          <button type="button" class="btn btn-primary btn-block" id="insSave">儲存健保紀錄</button>
+
+          <details class="help"><summary>備註（選填）</summary><input type="text" id="insNote" placeholder="病人代號、備註…"></details>
         </div>
 
         <div id="form-cash" style="display:none;">
@@ -506,10 +552,8 @@
             <label id="cashAmountLabel" for="cashAmount">自費金額</label>
             <input type="number" id="cashAmount" placeholder="0" step="1" inputmode="numeric">
           </div>
-          <div class="row">
-            <div class="field"><label for="cashCommission">抽成比例（％）</label><input type="number" id="cashCommission" step="0.1" inputmode="decimal"></div>
-            <div class="field"><label>&nbsp;</label><div class="stat" style="padding:9px 12px;"><div class="label">預估收入</div><div class="value mono" id="cashPreview" style="font-size:18px;">$0</div></div></div>
-          </div>
+          <input type="hidden" id="cashCommission">
+          <div class="qtyrow"><div class="qprev"><span>預估收入</span><b class="mono" id="cashPreview">$0</b></div></div>
           <div class="field"><label for="cashDesc">項目說明</label><input type="text" id="cashDesc" placeholder="例如：植牙、牙冠、活動假牙…"></div>
           <button type="button" class="btn btn-primary btn-block" id="cashSave">儲存自費紀錄</button>
         </div>
@@ -517,13 +561,7 @@
     </div>
 
     <div class="add-side">
-      <div class="card" id="pickerCard">
-        <h2>瀏覽申報代碼</h2>
-        <div class="chips" id="pickCats"></div>
-        <div class="chips" id="pickSubs"></div>
-        <div class="picker-list" id="pickList"></div>
-      </div>
-      <div class="card" id="recentCard">
+<div class="card" id="recentCard">
         <h2>這間診所最近的紀錄</h2>
         <div id="recentList"></div>
       </div>
@@ -1232,7 +1270,7 @@
   $('#goAddClinic').addEventListener('click', () => goTo('clinics'));
 
   function renderAll(){
-    renderDash(); renderCodes(); renderClinics(); refreshClinicOptions(); renderFreq(); renderPicker(); renderRecent(); renderCloudForm();
+    renderDash(); renderCodes(); renderClinics(); refreshClinicOptions(); renderQuick(); renderRecent(); renderCloudForm();
   }
 
   /* =====================================================================
@@ -1249,7 +1287,6 @@
     $$('#entryTypeSeg button').forEach(b => b.classList.toggle('active', b.dataset.type === type));
     $('#form-insurance').style.display = type === 'insurance' ? '' : 'none';
     $('#form-cash').style.display = type === 'insurance' ? 'none' : '';
-    $('#pickerCard').classList.toggle('hidden', type !== 'insurance');
     applyClinicDefaults();
   }
 
@@ -1269,8 +1306,7 @@
     if(!$('#insDate').value) $('#insDate').value = todayStr();
     if(!$('#cashDate').value) $('#cashDate').value = todayStr();
     if(!editingInsId && !editingCashId) applyClinicDefaults();
-    $('#pickerCard').classList.toggle('hidden', entryType !== 'insurance');
-    renderFreq(); renderPicker(); renderRecent();
+    renderQuick(); renderRecent();
   }
   $('#entryClinic').addEventListener('change', () => {
     lsSet('lastClinic', $('#entryClinic').value);
@@ -1291,13 +1327,23 @@
     }
   }
 
-  /* ---- 找代碼 ---- */
+  /* ---- 找代碼：數字鍵盤 + 科別快選 ---- */
   function matchCode(c, q){
     if(!q) return true;
     const hay = (c.code + ' ' + c.name).toLowerCase();
     if(hay.includes(q)) return true;
     for(const k of Object.keys(ALIASES)){ if(q.includes(k.toLowerCase()) && c.name.includes(ALIASES[k])) return true; }
     return false;
+  }
+  const codeLike = q => /^[0-9p][0-9]*c?$/i.test(q);
+  function findCodes(q){
+    q = q.trim().toLowerCase();
+    if(!q) return [];
+    if(codeLike(q)){
+      const a = state.codes.filter(c => c.code.toLowerCase().startsWith(q));
+      if(a.length) return a;
+    }
+    return state.codes.filter(c => matchCode(c, q));
   }
   function chooseCode(code){
     const c = codeByCode(code);
@@ -1306,22 +1352,28 @@
     insSearch.value = c.code + ' ' + c.name;
     showSelectedInfo();
     $('#insSuggest').style.display = 'none';
-    updateInsPreview(); renderPicker();
+    updateInsPreview(); renderQuick();
   }
   function showSelectedInfo(){
     if(!selectedCode){ $('#insSelectedInfo').textContent = ''; return; }
     const s = selectedCode, sub = s.sub ? ` <span class="badge other">${esc(SUBS[s.sub] || s.sub)}</span>` : '';
-    $('#insSelectedInfo').innerHTML = `<span class="badge ${CATS[s.cat].cls}">${CATS[s.cat].label}</span>${sub} 支付點數：<b>${esc(s.points)}</b> 點／件`;
+    $('#insSelectedInfo').innerHTML = `<span class="badge ${CATS[s.cat].cls}">${CATS[s.cat].label}</span>${sub} <b>${esc(s.points)}</b> 點／件`;
   }
   insSearch.addEventListener('input', () => {
-    const q = insSearch.value.trim().toLowerCase();
+    const q = insSearch.value.trim();
     selectedCode = null; showSelectedInfo(); updateInsPreview();
     const box = $('#insSuggest');
-    renderPicker();
-    if(!q){ box.style.display = 'none'; return; }
-    const matches = state.codes.filter(c => matchCode(c, q)).sort((a, b) => a.code.localeCompare(b.code)).slice(0, 30);
-    box.innerHTML = matches.length
-      ? matches.map(c => `<div class="opt" data-code="${esc(c.code)}"><span class="code">${esc(c.code)}</span>${esc(c.name)} <span class="hint">· ${esc(c.points)}點</span></div>`).join('')
+    if(!q){ box.style.display = 'none'; renderQuick(); return; }
+    const matches = findCodes(q).sort((a, b) => a.code.localeCompare(b.code));
+    if(codeLike(q)){
+      const ql = q.toLowerCase();
+      const ex = matches.find(c => c.code.toLowerCase() === ql || c.code.toLowerCase() === ql + 'c');
+      if(ex){ chooseCode(ex.code); return; }
+    }
+    renderQuick();
+    const list = matches.slice(0, 12);
+    box.innerHTML = list.length
+      ? list.map(c => `<div class="opt" data-code="${esc(c.code)}"><span class="code">${esc(c.code)}</span>${esc(c.name)} <span class="hint">· ${esc(c.points)}點</span></div>`).join('')
       : '<div class="empty">找不到符合的代碼，可到「代碼庫」新增</div>';
     box.style.display = 'block';
   });
@@ -1329,45 +1381,54 @@
     const opt = e.target.closest('.opt');
     if(opt && opt.dataset.code) chooseCode(opt.dataset.code);
   });
-  document.addEventListener('click', e => { if(!e.target.closest('.search-box')) $('#insSuggest').style.display = 'none'; });
 
-  /* ---- 常用代碼 ---- */
-  function shortName(n){ return n.length > 9 ? n.slice(0, 9) + '…' : n; }
-  function renderFreq(){
-    const el = $('#freqChips');
+  /* 數字鍵盤 */
+  let textMode = false;
+  function setTextMode(on){
+    textMode = on;
+    insSearch.inputMode = on ? 'text' : 'none';
+    insSearch.placeholder = on ? '輸入代碼或名稱，例如 洗牙、根管' : '用下方按鈕輸入代碼';
+    $('#keyTxt').textContent = on ? '數字' : '名稱';
+    if(on) insSearch.focus(); else insSearch.blur();
+  }
+  $('#keypad').addEventListener('click', e => {
+    const btn = e.target.closest('button[data-k]');
+    if(!btn) return;
+    const k = btn.dataset.k;
+    if(k === 'txt'){ setTextMode(!textMode); return; }
+    let v = insSearch.value;
+    if(k === 'bs') v = selectedCode ? '' : v.slice(0, -1);
+    else if(k === 'clr') v = '';
+    else v = (selectedCode ? '' : v) + k;
+    insSearch.value = v;
+    insSearch.dispatchEvent(new Event('input'));
+  });
+
+  /* 科別快選 */
+  let qCat = 'freq', qSub = 'all';
+  const FREQ_DEFAULT = ['91004C','91003C','91005C','89004C','89005C','89008C','89001C','90001C','90002C','90003C','90004C','92013C','34001C','34002C','96001C','01272C','P7302C','00315C'];
+  function freqCodes(){
     const cnt = new Map();
-    [...state.entries].sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0)).slice(0, 400).forEach(e => cnt.set(e.code, (cnt.get(e.code) || 0) + 1));
-    let top = [...cnt.entries()].sort((a, b) => b[1] - a[1]).map(x => x[0]).filter(codeByCode).slice(0, 8);
-    for(const c of ['91004C','91003C','89004C','89008C','90001C','92013C','34001C','01272C']){
-      if(top.length >= 8) break;
-      if(!top.includes(c) && codeByCode(c)) top.push(c);
-    }
-    el.innerHTML = top.length ? '<span class="freq-l">常用</span>' + top.map(c => {
-      const x = codeByCode(c);
-      return `<button type="button" class="chip fchip" data-code="${esc(c)}"><b class="mono">${esc(c.replace(/C$/, ''))}</b> ${esc(shortName(x.name))}</button>`;
-    }).join('') : '';
+    state.entries.forEach(e => cnt.set(e.code, (cnt.get(e.code) || 0) + 1));
+    const top = [...cnt.entries()].sort((a, b) => b[1] - a[1]).map(x => x[0]).filter(codeByCode);
+    for(const c of FREQ_DEFAULT){ if(top.length >= 24) break; if(!top.includes(c) && codeByCode(c)) top.push(c); }
+    return top.slice(0, 24).map(codeByCode);
   }
-  $('#freqChips').addEventListener('click', e => { const b = e.target.closest('.fchip'); if(b) chooseCode(b.dataset.code); });
-
-  /* ---- 平板：瀏覽代碼 ---- */
-  let pickCat = 'all', pickSub = 'all';
-  function renderPicker(){
-    if(!$('#pickList')) return;
-    const cats = [['all', '全部'], ...Object.entries(CATS).map(([k, v]) => [k, v.label])];
-    $('#pickCats').innerHTML = cats.map(([k, l]) => `<button type="button" class="chip ${k === pickCat ? 'active' : ''}" data-cat="${k}">${l}</button>`).join('');
-    $('#pickSubs').innerHTML = pickCat === 'other'
-      ? [['all', '全部'], ...Object.entries(SUBS)].map(([k, l]) => `<button type="button" class="chip ${k === pickSub ? 'active' : ''}" data-sub="${k}">${l}</button>`).join('') : '';
-    const q = selectedCode ? '' : insSearch.value.trim().toLowerCase();
-    let list = state.codes.filter(c => (pickCat === 'all' || c.cat === pickCat) && (pickCat !== 'other' || pickSub === 'all' || c.sub === pickSub) && matchCode(c, q));
-    list.sort((a, b) => a.code.localeCompare(b.code));
-    $('#pickList').innerHTML = list.length ? list.map(c => `
-      <button type="button" class="pick ${selectedCode && selectedCode.code === c.code ? 'selected' : ''}" data-code="${esc(c.code)}">
-        <span class="pc">${esc(c.code)}</span><span class="pn">${esc(c.name)}</span><span class="pp">${esc(c.points)}</span>
-      </button>`).join('') : '<div class="empty-state">沒有符合的代碼</div>';
+  function renderQuick(){
+    const tabs = [['freq', '常用'], ...Object.entries(CATS).map(([k, v]) => [k, v.label])];
+    $('#qCats').innerHTML = tabs.map(([k, l]) => `<button type="button" class="chip ${k === qCat ? 'active' : ''}" data-q="${k}">${l}</button>`).join('');
+    $('#qSubs').innerHTML = qCat === 'other'
+      ? [['all', '全部'], ...Object.entries(SUBS)].map(([k, l]) => `<button type="button" class="chip ${k === qSub ? 'active' : ''}" data-qs="${k}">${l}</button>`).join('') : '';
+    const list = qCat === 'freq' ? freqCodes()
+      : state.codes.filter(c => c.cat === qCat && (qCat !== 'other' || qSub === 'all' || c.sub === qSub)).sort((a, b) => a.code.localeCompare(b.code));
+    $('#qGrid').innerHTML = list.length ? list.map(c => `
+      <button type="button" class="qbtn ${selectedCode && selectedCode.code === c.code ? 'selected' : ''}" data-code="${esc(c.code)}" style="border-left-color:var(--${CAT_COLOR[c.cat] || 'gray'});">
+        <span class="qn">${esc(c.name)}</span><span class="qm"><span class="qcode">${esc(c.code)}</span><span class="qpts">${esc(c.points)}點</span></span>
+      </button>`).join('') : '<div class="empty-state">沒有代碼</div>';
   }
-  $('#pickCats').addEventListener('click', e => { const b = e.target.closest('[data-cat]'); if(b){ pickCat = b.dataset.cat; pickSub = 'all'; renderPicker(); } });
-  $('#pickSubs').addEventListener('click', e => { const b = e.target.closest('[data-sub]'); if(b){ pickSub = b.dataset.sub; renderPicker(); } });
-  $('#pickList').addEventListener('click', e => { const b = e.target.closest('.pick'); if(b) chooseCode(b.dataset.code); });
+  $('#qCats').addEventListener('click', e => { const b = e.target.closest('[data-q]'); if(b){ qCat = b.dataset.q; qSub = 'all'; renderQuick(); } });
+  $('#qSubs').addEventListener('click', e => { const b = e.target.closest('[data-qs]'); if(b){ qSub = b.dataset.qs; renderQuick(); } });
+  $('#qGrid').addEventListener('click', e => { const b = e.target.closest('.qbtn'); if(b) chooseCode(b.dataset.code); });
 
   /* ---- 預覽 ---- */
   function updateInsPreview(){
@@ -1389,11 +1450,11 @@
     selectedCode = null; insSearch.value = ''; $('#insSelectedInfo').textContent = '';
     $('#insQty').value = 1; $('#insNote').value = '';
     $('#insSuggest').style.display = 'none';
-    applyClinicDefaults(); updateInsPreview();
+    applyClinicDefaults(); updateInsPreview(); renderQuick();
   }
   function resetCashForm(){ $('#cashAmount').value = ''; $('#cashDesc').value = ''; updateCashPreview(); }
   $('#cancelEdit').addEventListener('click', () => {
-    editingInsId = null; editingCashId = null; setEditing(false); resetInsForm(); resetCashForm(); setEntryType('insurance'); renderPicker();
+    editingInsId = null; editingCashId = null; setEditing(false); resetInsForm(); resetCashForm(); setEntryType('insurance'); renderQuick();
   });
 
   $('#insSave').addEventListener('click', async () => {
@@ -1416,8 +1477,7 @@
     editingInsId = null; setEditing(false);
     resetInsForm();
     toast(editing ? '已更新紀錄' : `已儲存 ${rec.code}（預估 ${fmt(incomeOfIns(rec))}）`);
-    if(isWide() && !editing){ renderFreq(); renderPicker(); renderRecent(); }
-    else goTo('dash');
+    if(editing) goTo('dash'); else { renderQuick(); renderRecent(); }
   });
 
   $('#cashSave').addEventListener('click', async () => {
@@ -1439,7 +1499,7 @@
     editingCashId = null; setEditing(false);
     resetCashForm();
     toast(editing ? '已更新紀錄' : `已儲存自費紀錄（預估 ${fmt(incomeOfCash(rec))}）`);
-    if(isWide() && !editing) renderRecent(); else goTo('dash');
+    if(editing) goTo('dash'); else renderRecent();
   });
 
   /* ---- 紀錄列（總覽與「最近紀錄」共用） ---- */
@@ -1484,7 +1544,7 @@
       confirmAction('刪除這筆紀錄？', '刪除後無法復原。', () => {
         if(kind === 'ins') state.entries = state.entries.filter(x => x.id !== id);
         else state.cash = state.cash.filter(x => x.id !== id);
-        addTomb(id); persist(); renderDash(); renderRecent(); renderFreq(); toast('已刪除');
+        addTomb(id); persist(); renderDash(); renderRecent(); toast('已刪除');
       });
     } else if(act === 'edit'){
       if(kind === 'ins'){
@@ -1497,7 +1557,7 @@
         insSearch.value = rec.code + ' ' + rec.name; showSelectedInfo();
         $('#insQty').value = rec.qty; $('#insPointValue').value = rec.pointValue; $('#insCommission').value = rec.commission;
         $('#insNote').value = rec.note || '';
-        updateInsPreview(); renderPicker();
+        updateInsPreview(); renderQuick();
       } else {
         const rec = state.cash.find(x => x.id === id); if(!rec) return;
         goTo('add'); setEntryType(rec.type);
@@ -1661,7 +1721,7 @@
     }
     persist();
     $('#codeModalBg').classList.remove('show');
-    renderCodes(); renderFreq(); renderPicker();
+    renderCodes(); renderQuick();
     toast('已儲存代碼（新點數只套用在之後新增的紀錄）');
   });
   $('#codeList').addEventListener('click', e => {
@@ -1672,7 +1732,7 @@
     else confirmAction('刪除這個代碼？', `代碼 ${rec.code}「${rec.name}」將從代碼庫移除（不影響已存的紀錄）。`, () => {
       state.codes = state.codes.filter(c => c.code !== rec.code);
       addTomb(rec.code.toUpperCase()); persist();
-      renderCodes(); renderFreq(); renderPicker(); toast('已刪除代碼');
+      renderCodes(); renderQuick(); toast('已刪除代碼');
     });
   });
 
