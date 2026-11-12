@@ -1,0 +1,1820 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<!-- v3-built -->
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>牙科申報記帳</title>
+<link rel="apple-touch-icon" href="data:image/png;base64,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">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="牙科記帳">
+<meta name="theme-color" content="#0F6B5C">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:wght@500;600;700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#EEF2F0;
+    --paper:#FFFFFF;
+    --ink:#17231F;
+    --ink-soft:#5B6B65;
+    --line:#D9E1DC;
+    --teal:#0F6B5C;
+    --teal-soft:#E1EFEA;
+    --amber:#B9812E;
+    --amber-soft:#F5EADA;
+    --blue:#3B6EA5;
+    --blue-soft:#E2EAF3;
+    --brick:#AD4430;
+    --brick-soft:#F5E1DC;
+    --gray:#6B7280;
+    --gray-soft:#E9EAEC;
+    --money:#1E7A49;
+    --danger:#B3432E;
+    --radius:14px;
+    --shadow: 0 1px 2px rgba(23,35,31,.06), 0 4px 16px rgba(23,35,31,.05);
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--bg);
+    color:var(--ink);
+    font-family:'Inter',system-ui,sans-serif;
+    -webkit-font-smoothing:antialiased;
+    min-height:100vh;
+    padding-bottom:60px;
+  }
+  .mono{font-family:'IBM Plex Mono',monospace;}
+  h1,h2,h3{font-family:'Newsreader',serif; margin:0; letter-spacing:-.01em;}
+  .wrap{max-width:880px; margin:0 auto; padding:0 16px;}
+
+  header.top{
+    background:var(--paper);
+    border-bottom:1px solid var(--line);
+    position:sticky; top:0; z-index:20;
+  }
+  .top-inner{
+    max-width:880px; margin:0 auto; padding:16px 16px 0 16px;
+    display:flex; align-items:baseline; justify-content:space-between; gap:12px; flex-wrap:wrap;
+  }
+  .brand{display:flex; align-items:baseline; gap:10px;}
+  .brand h1{font-size:22px; font-weight:700; color:var(--ink);}
+  .brand .sub{font-size:12px; color:var(--ink-soft); font-family:'IBM Plex Mono',monospace;}
+  nav.tabs{
+    display:flex; gap:4px; margin-top:14px; overflow-x:auto;
+    scrollbar-width:none;
+  }
+  nav.tabs::-webkit-scrollbar{display:none;}
+  nav.tabs button{
+    appearance:none; border:none; background:none; cursor:pointer;
+    font-family:'Inter',sans-serif; font-size:14px; font-weight:600; color:var(--ink-soft);
+    padding:10px 14px; border-radius:10px 10px 0 0; white-space:nowrap;
+    border-bottom:2px solid transparent;
+  }
+  nav.tabs button.active{color:var(--teal); border-bottom-color:var(--teal); background:var(--teal-soft);}
+
+  main{max-width:880px; margin:0 auto; padding:20px 16px 40px;}
+  .view{display:none;}
+  .view.active{display:block; animation:fade .25s ease;}
+  @keyframes fade{from{opacity:0; transform:translateY(4px)} to{opacity:1; transform:none}}
+
+  .card{
+    background:var(--paper); border:1px solid var(--line); border-radius:var(--radius);
+    padding:18px; box-shadow:var(--shadow);
+  }
+  .card + .card{margin-top:14px;}
+  .card h2{font-size:17px; margin-bottom:12px;}
+  .card h3.sub-h{font-size:13px; font-family:'Inter',sans-serif; font-weight:700; color:var(--ink-soft); text-transform:uppercase; letter-spacing:.03em; margin:16px 0 8px;}
+  .grid-2{display:grid; grid-template-columns:1fr 1fr; gap:12px;}
+  .grid-3{display:grid; grid-template-columns:repeat(3,1fr); gap:12px;}
+  @media (max-width:560px){ .grid-3{grid-template-columns:1fr 1fr;} }
+
+  .stat{ border-radius:12px; padding:14px 16px; background:var(--gray-soft); }
+  .stat .label{font-size:12px; color:var(--ink-soft); font-weight:600;}
+  .stat .value{font-family:'IBM Plex Mono',monospace; font-size:22px; font-weight:600; margin-top:4px;}
+  .stat.money{background:var(--teal-soft);}
+  .stat.money .value{color:var(--teal);}
+  .stat.total{background:var(--ink);}
+  .stat.total .label{color:#cfe0da;}
+  .stat.total .value{color:#fff; font-size:26px;}
+
+  label{font-size:12px; font-weight:600; color:var(--ink-soft); display:block; margin-bottom:5px;}
+  input[type=text],input[type=number],input[type=date],select,textarea{
+    width:100%; border:1px solid var(--line); border-radius:9px; padding:9px 11px;
+    font-family:'Inter',sans-serif; font-size:14px; background:#fff; color:var(--ink);
+  }
+  input:focus,select:focus,textarea:focus{outline:2px solid var(--teal); outline-offset:1px;}
+  .field{margin-bottom:12px;}
+  .row{display:flex; gap:10px;}
+  .row > *{flex:1;}
+
+  button.btn{
+    appearance:none; border:none; cursor:pointer; border-radius:9px; padding:10px 16px;
+    font-family:'Inter',sans-serif; font-weight:600; font-size:14px;
+  }
+  .btn-primary{background:var(--teal); color:#fff;}
+  .btn-primary:hover{background:#0c584c;}
+  .btn-ghost{background:var(--gray-soft); color:var(--ink);}
+  .btn-ghost:hover{background:#dfe3e1;}
+  .btn-danger{background:var(--brick-soft); color:var(--danger);}
+  .btn-danger:hover{background:#f0d0c8;}
+  .btn-sm{padding:6px 10px; font-size:12.5px; border-radius:7px;}
+  .btn-block{width:100%;}
+
+  .seg{display:flex; gap:6px; background:var(--gray-soft); padding:4px; border-radius:11px; margin-bottom:16px;}
+  .seg button{flex:1; padding:9px; border-radius:8px; border:none; background:none; cursor:pointer;
+    font-weight:600; font-size:13.5px; color:var(--ink-soft);}
+  .seg button.active{background:#fff; color:var(--ink); box-shadow:var(--shadow);}
+
+  .badge{ display:inline-flex; align-items:center; gap:5px; font-size:11.5px; font-weight:700; padding:3px 8px; border-radius:20px; }
+  .badge.perio{background:var(--teal-soft); color:var(--teal);}
+  .badge.endo{background:var(--amber-soft); color:var(--amber);}
+  .badge.od{background:var(--blue-soft); color:var(--blue);}
+  .badge.surgery{background:var(--brick-soft); color:var(--brick);}
+  .badge.other{background:var(--gray-soft); color:var(--gray);}
+
+  .dot{display:inline-block; width:9px; height:9px; border-radius:50%; flex-shrink:0;}
+  .clinic-tag{display:inline-flex; align-items:center; gap:6px; font-size:12px; font-weight:700; color:var(--ink-soft);}
+
+  .entry-row{ display:flex; align-items:center; justify-content:space-between; gap:10px; padding:11px 4px; border-bottom:1px solid var(--line); }
+  .entry-row:last-child{border-bottom:none;}
+  .entry-main{display:flex; flex-direction:column; gap:3px; min-width:0;}
+  .entry-main .name{font-weight:600; font-size:14px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; display:flex; align-items:center; gap:6px;}
+  .entry-main .meta{font-size:12px; color:var(--ink-soft);}
+  .entry-amt{font-family:'IBM Plex Mono',monospace; font-weight:600; font-size:15px; white-space:nowrap;}
+  .entry-actions{display:flex; gap:6px;}
+  .icon-btn{background:none; border:none; cursor:pointer; color:var(--ink-soft); padding:4px; font-size:13px;}
+  .icon-btn:hover{color:var(--ink);}
+
+  .search-box{position:relative;}
+  .suggest{ position:absolute; top:calc(100% + 4px); left:0; right:0; background:#fff; border:1px solid var(--line); border-radius:10px; box-shadow:var(--shadow); max-height:260px; overflow-y:auto; z-index:30; }
+  .suggest .opt{padding:9px 12px; cursor:pointer; border-bottom:1px solid var(--line); font-size:13.5px;}
+  .suggest .opt:last-child{border-bottom:none;}
+  .suggest .opt:hover{background:var(--teal-soft);}
+  .suggest .opt .code{font-family:'IBM Plex Mono',monospace; font-weight:600; margin-right:6px; color:var(--teal);}
+  .suggest .empty{padding:10px 12px; font-size:13px; color:var(--ink-soft);}
+
+  .chips{display:flex; gap:6px; flex-wrap:wrap; margin-bottom:12px;}
+  .chip{ border:1px solid var(--line); background:#fff; border-radius:20px; padding:6px 12px; font-size:12.5px; font-weight:600; cursor:pointer; color:var(--ink-soft); display:inline-flex; align-items:center; gap:6px;}
+  .chip.active{background:var(--ink); color:#fff; border-color:var(--ink);}
+  .chip.active .dot{outline:2px solid rgba(255,255,255,.6);}
+
+  .code-row{display:flex; align-items:center; gap:10px; padding:9px 4px; border-bottom:1px solid var(--line);}
+  .code-row:last-child{border-bottom:none;}
+  .code-row .code{font-family:'IBM Plex Mono',monospace; font-weight:600; font-size:13px; color:var(--teal); width:70px; flex-shrink:0;}
+  .code-row .cname{flex:1; font-size:13.5px; min-width:0;}
+  .code-row .cpts{font-family:'IBM Plex Mono',monospace; font-size:13.5px; width:58px; text-align:right;}
+
+  .clinic-card{border:1px solid var(--line); border-radius:12px; padding:14px; margin-bottom:10px;}
+  .clinic-card .head{display:flex; align-items:center; justify-content:space-between; margin-bottom:10px;}
+  .clinic-card .head .name{font-weight:700; font-size:15px; display:flex; align-items:center; gap:8px;}
+  .clinic-card .rates{display:grid; grid-template-columns:repeat(2,1fr); gap:8px; font-size:12.5px; color:var(--ink-soft);}
+  .clinic-card .rates b{color:var(--ink); font-family:'IBM Plex Mono',monospace;}
+
+  .swatches{display:flex; gap:8px; flex-wrap:wrap; margin-bottom:4px;}
+  .swatch{width:26px; height:26px; border-radius:50%; cursor:pointer; border:2px solid transparent;}
+  .swatch.active{border-color:var(--ink); box-shadow:0 0 0 2px #fff inset;}
+
+  .empty-state{padding:30px 10px; text-align:center; color:var(--ink-soft); font-size:13.5px;}
+  .hint{font-size:12px; color:var(--ink-soft); margin-top:4px;}
+  .divider{height:1px; background:var(--line); margin:16px 0;}
+  .toast{ position:fixed; bottom:20px; left:50%; transform:translateX(-50%); background:var(--ink); color:#fff; padding:10px 18px; border-radius:20px; font-size:13px; font-weight:600; opacity:0; pointer-events:none; transition:opacity .25s; z-index:100; }
+  .toast.show{opacity:1;}
+  .flex-between{display:flex; justify-content:space-between; align-items:center; gap:8px;}
+
+  .modal-bg{ position:fixed; inset:0; background:rgba(23,35,31,.4); display:none; align-items:center; justify-content:center; z-index:50; padding:16px; }
+  .modal-bg.show{display:flex;}
+  .modal{background:#fff; border-radius:16px; padding:20px; max-width:420px; width:100%; box-shadow:var(--shadow); max-height:90vh; overflow-y:auto;}
+  .modal h3{margin-bottom:10px;}
+  .modal .actions{display:flex; gap:8px; margin-top:16px; justify-content:flex-end;}
+
+  table.mini{width:100%; border-collapse:collapse; font-size:13px;}
+  table.mini th{text-align:left; font-size:11px; text-transform:uppercase; letter-spacing:.02em; color:var(--ink-soft); padding:6px 6px; border-bottom:1px solid var(--line);}
+  table.mini td{padding:8px 6px; border-bottom:1px solid var(--line); vertical-align:middle;}
+  table.mini tr:last-child td{border-bottom:none;}
+  table.mini td.num{font-family:'IBM Plex Mono',monospace; text-align:right;}
+
+  ::selection{background:var(--teal-soft);}
+
+
+
+  /* ================= v3 refinements ================= */
+  html{-webkit-text-size-adjust:100%;}
+  body{padding-bottom:calc(60px + env(safe-area-inset-bottom));}
+  button{font-family:inherit;}
+  button:focus-visible,.chip:focus-visible,.pick:focus-visible{outline:2px solid var(--teal); outline-offset:2px;}
+  input[type=text],input[type=number],input[type=date],input[type=password],select,textarea{
+    width:100%; border:1px solid var(--line); border-radius:10px; padding:10px 12px; min-height:46px;
+    font-family:'Inter',system-ui,sans-serif; font-size:16px; background:#fff; color:var(--ink);
+  }
+  input[readonly]{background:var(--gray-soft);}
+  button.btn{min-height:46px;}
+  .btn-sm{min-height:38px; padding:7px 12px;}
+  .icon-btn{min-width:40px; min-height:40px; font-size:16px; border-radius:8px;}
+  .icon-btn:active{background:var(--gray-soft);}
+  .chip{min-height:38px; padding:8px 14px; font-family:inherit;}
+  .hidden{display:none !important;}
+  main{padding-left:max(16px,env(safe-area-inset-left)); padding-right:max(16px,env(safe-area-inset-right));}
+
+  /* header / brand / nav */
+  header.top{position:sticky; top:0; z-index:30;}
+  .top-inner{align-items:center;}
+  .brand{display:flex; align-items:center; gap:10px;}
+  .brand .mark{width:30px; height:30px; color:var(--teal); flex-shrink:0;}
+  .brand-t{display:flex; align-items:baseline; gap:10px;}
+  .brand-t .sub{display:none;}
+  .tab-ico{display:none; width:24px; height:24px; fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round;}
+  .sync{
+    position:absolute; top:18px; right:16px; display:flex; align-items:center; gap:7px;
+    border:none; background:none; cursor:pointer; color:var(--ink-soft); font-size:12.5px; font-weight:700; padding:6px 4px; min-height:36px;
+  }
+  .sdot{width:9px; height:9px; border-radius:50%; background:#9aa5a0; flex-shrink:0;}
+  .sync[data-s="ok"]{color:var(--teal);} .sync[data-s="ok"] .sdot{background:var(--money);}
+  .sync[data-s="syncing"] .sdot{background:var(--amber); animation:pulse 1s ease-in-out infinite;}
+  .sync[data-s="error"]{color:var(--danger);} .sync[data-s="error"] .sdot{background:var(--danger);}
+  @keyframes pulse{50%{opacity:.35}}
+
+  /* steppers, edit banner, frequent chips */
+  .stepper{display:flex; gap:6px; align-items:stretch;}
+  .stepper input{text-align:center; flex:1; min-width:0;}
+  .stepper button{width:46px; border:1px solid var(--line); background:#fff; border-radius:10px; font-size:22px; cursor:pointer; color:var(--ink);}
+  .stepper button:active{background:var(--gray-soft);}
+  .edit-banner{display:flex; align-items:center; justify-content:space-between; gap:10px; background:var(--amber-soft); color:#7a5516; padding:8px 12px; border-radius:10px; font-size:13px; font-weight:600; margin-bottom:12px;}
+  .freq{display:flex; gap:6px; overflow-x:auto; padding-bottom:4px; margin:0 0 12px; scrollbar-width:none; align-items:center;}
+  .freq::-webkit-scrollbar{display:none;}
+  .freq-l{font-size:12px; font-weight:700; color:var(--ink-soft); flex-shrink:0;}
+  .fchip{white-space:nowrap; flex-shrink:0; margin:0;}
+  .fchip b{color:var(--teal);}
+
+  /* picker (tablet) */
+  .picker-list{display:grid; grid-template-columns:1fr; gap:6px; max-height:min(54vh,480px); overflow-y:auto; padding:2px;}
+  .pick{display:flex; align-items:center; gap:10px; width:100%; text-align:left; padding:10px 12px; min-height:54px; border:1px solid var(--line); border-radius:12px; background:#fff; cursor:pointer; color:var(--ink);}
+  .pick:active{background:var(--teal-soft);}
+  .pick.selected{border-color:var(--teal); background:var(--teal-soft);}
+  .pick .pc{font-family:'IBM Plex Mono',monospace; font-weight:600; font-size:13px; color:var(--teal); width:64px; flex-shrink:0;}
+  .pick .pn{flex:1; font-size:14.5px; line-height:1.35; min-width:0;}
+  .pick .pp{font-family:'IBM Plex Mono',monospace; font-weight:600; font-size:14px; white-space:nowrap;}
+  #pickerCard,#recentCard{display:none;}
+
+  /* code rows */
+  .code-row{min-height:50px;}
+  .code-row .cname{line-height:1.35;}
+  .code-row .sub-tag{font-size:11px; color:var(--ink-soft); font-weight:600; margin-left:6px;}
+  .ver-note{font-size:12px; color:var(--ink-soft); margin:-4px 0 10px;}
+
+  details.help{margin-top:12px; font-size:13px; color:var(--ink-soft);}
+  details.help summary{cursor:pointer; font-weight:700; color:var(--ink); padding:6px 0; min-height:36px;}
+  details.help ol{margin:6px 0 0; padding-left:20px; line-height:1.7;}
+
+  .dash-left > * + *{margin-top:14px;}
+  .dash-split{display:grid; gap:14px;}
+  .dash-split .card + .card{margin-top:0;}
+  .add-main,.add-side{min-width:0;}
+  .modal{max-width:460px;}
+  .clinic-card{margin-bottom:10px;}
+  #clinicList{display:block;}
+  @media (prefers-reduced-motion:reduce){ *{animation:none !important; transition:none !important;} }
+
+  /* ================= iPad portrait & small tablets (>=768) : icon rail ================= */
+  @media (min-width:768px){
+    body{padding-bottom:0; padding-left:96px;}
+    header.top{position:fixed; top:0; left:0; bottom:0; width:96px; border-right:1px solid var(--line); border-bottom:0; display:flex; flex-direction:column; overflow-y:auto; padding-top:env(safe-area-inset-top);}
+    .top-inner{padding:20px 8px 4px; justify-content:center;}
+    .brand{flex-direction:column; gap:4px;}
+    .brand .mark{width:38px; height:38px;}
+    .brand-t{display:none;}
+    header .wrap{padding:0 10px; max-width:none; margin:0;}
+    nav.tabs{flex-direction:column; gap:8px; margin-top:16px; overflow:visible;}
+    nav.tabs button{display:flex; flex-direction:column; align-items:center; justify-content:center; gap:5px; padding:11px 4px; min-height:68px; border-radius:16px; border-bottom:0; font-size:12px;}
+    nav.tabs button.active{background:var(--teal-soft); color:var(--teal); border-bottom:0;}
+    .tab-ico{display:block;}
+    .sync{position:static; margin-top:auto; flex-direction:column; gap:4px; text-align:center; padding:12px 4px calc(16px + env(safe-area-inset-bottom)); font-size:11.5px; width:100%; justify-content:center;}
+    main{max-width:1240px; margin:0 auto; padding:30px 28px 56px; padding-top:calc(30px + env(safe-area-inset-top));}
+    .card{padding:20px;}
+    .card h2{font-size:19px;}
+    .stat .value{font-size:24px;}
+    .stat.total .value{font-size:30px;}
+    .entry-row{padding:13px 6px;}
+    .entry-main .name{font-size:15px;}
+    .entry-main .meta{font-size:12.5px;}
+    .entry-amt{font-size:16px;}
+    .modal{max-width:520px; padding:24px;}
+    #pickerCard,#recentCard{display:block;}
+    .add-side{display:flex; flex-direction:column; gap:16px; margin-top:16px;}
+    .add-side .card + .card{margin-top:0;}
+    .dash-left{display:grid; grid-template-columns:1fr 1fr; gap:16px; align-items:start;}
+    .dash-left > * + *{margin-top:0;}
+    .dash-left > .span2{grid-column:1 / -1;}
+    .dash-split{grid-column:1 / -1; grid-template-columns:repeat(auto-fit,minmax(280px,1fr)); gap:16px; align-items:start;}
+    .dash-right{margin-top:16px;}
+    #clinicList{display:grid; grid-template-columns:repeat(auto-fill,minmax(300px,1fr)); gap:12px;}
+    .clinic-card{margin-bottom:0;}
+    .code-row{padding:11px 8px;}
+    .code-row .cname{font-size:15px;}
+    .code-row .cpts{font-size:15px; width:70px;}
+    .code-row .code{font-size:14px; width:78px;}
+  }
+
+  /* ================= iPad landscape / large (>=1024) : full sidebar ================= */
+  @media (min-width:1024px){
+    body{padding-left:240px;}
+    header.top{width:240px;}
+    .top-inner{padding:28px 20px 6px; justify-content:flex-start;}
+    .brand{flex-direction:row; gap:12px;}
+    .brand-t{display:block;}
+    .brand-t h1{font-size:20px; line-height:1.15;}
+    .brand-t .sub{display:block; font-size:10.5px; margin-top:3px; letter-spacing:.04em;}
+    header .wrap{padding:0 14px;}
+    nav.tabs button{flex-direction:row; justify-content:flex-start; gap:14px; padding:12px 16px; min-height:52px; font-size:15.5px; border-radius:14px;}
+    .sync{flex-direction:row; justify-content:flex-start; text-align:left; padding:14px 24px calc(18px + env(safe-area-inset-bottom)); font-size:12.5px;}
+    main{padding-left:32px; padding-right:32px;}
+
+    .dash-grid{display:grid; grid-template-columns:minmax(360px,410px) minmax(0,1fr); gap:24px; align-items:start;}
+    .dash-left{display:block; position:sticky; top:24px; max-height:calc(100vh - 48px); overflow-y:auto; padding:2px; margin:-2px; scrollbar-width:thin;}
+    .dash-left > * + *{margin-top:16px;}
+    .dash-split{display:grid; grid-template-columns:1fr; gap:16px; margin-top:16px;}
+    .dash-right{margin-top:0;}
+
+    #view-add.active{display:grid; grid-template-columns:minmax(380px,500px) minmax(0,1fr); gap:24px; align-items:start;}
+    #view-add > #addNoClinic{grid-column:1 / -1;}
+    .add-side{margin-top:0; position:sticky; top:24px;}
+    .picker-list{max-height:calc(100vh - 380px); min-height:200px;}
+    #insSuggest{display:none !important;}
+
+    #view-clinics.active{display:grid; grid-template-columns:1fr 1fr; gap:24px; align-items:start;}
+    #view-clinics .card + .card{margin-top:0;}
+    #view-clinics .span-all{grid-column:1 / -1;}
+  }
+
+  @media (min-width:1280px){
+    .picker-list{grid-template-columns:1fr 1fr;}
+  }
+
+  /* phones in landscape / very small */
+  @media (max-width:380px){
+    .grid-3{grid-template-columns:1fr;}
+    .brand-t .sub{display:none;}
+  }
+
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="top-inner">
+    <div class="brand">
+      <svg class="mark" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="8" fill="currentColor"/><path d="M10.2 7.5c-2.2 0-3.7 1.6-3.7 4.1 0 1.9.7 3.2 1.3 5 .6 1.8.7 4.4 1.4 6.600.3 1 1.400 1.100 1.800.2.500-1.300.6-3.300 1.300-3.300h.1c.7 0 .8 2 1.300 3.300.4.900 1.500.8 1.800-.2.700-2.200.8-4.800 1.400-6.600.6-1.800 1.300-3.100 1.300-5 0-2.500-1.500-4.100-3.700-4.100-1.600 0-2.200.8-3.300.8s-1.700-.8-3.300-.8z" fill="#fff" transform="translate(2.9 .6) scale(.82)"/></svg>
+      <div class="brand-t">
+        <h1>牙科申報記帳</h1>
+        <span class="sub">DENTAL CLAIM LEDGER</span>
+      </div>
+    </div>
+  </div>
+  <div class="wrap">
+    <nav class="tabs" aria-label="主選單">
+      <button type="button" data-view="dash" class="active">
+        <svg class="tab-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 20V11M12 20V4M19 20v-6M3 20h18"/></svg><span>總覽</span></button>
+      <button type="button" data-view="add">
+        <svg class="tab-ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/></svg><span>新增紀錄</span></button>
+      <button type="button" data-view="codes">
+        <svg class="tab-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 6h12M8 12h12M8 18h12M4 6h.01M4 12h.01M4 18h.01"/></svg><span>代碼庫</span></button>
+      <button type="button" data-view="clinics">
+        <svg class="tab-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 21V6l8-3 8 3v15M2 21h20M9 21v-5h6v5M9 9.500h2M13 9.500h2M9 13h2M13 13h2"/></svg><span>診所</span></button>
+    </nav>
+  </div>
+  <button type="button" class="sync" id="syncBadge" data-s="off" aria-live="polite"><span class="sdot"></span><span id="syncText">未同步</span></button>
+</header>
+
+<main>
+
+  <!-- ===== DASHBOARD ===== -->
+  <section id="view-dash" class="view active">
+    <div class="dash-grid">
+      <div class="dash-left">
+        <div class="card span2">
+          <h3 class="sub-h" style="margin-top:0;">診所</h3>
+          <div class="chips" id="clinicChips"></div>
+          <h3 class="sub-h">期間</h3>
+          <div class="chips" id="rangeChips">
+            <button type="button" class="chip active" data-range="month">本月</button>
+            <button type="button" class="chip" data-range="lastmonth">上月</button>
+            <button type="button" class="chip" data-range="year">今年</button>
+            <button type="button" class="chip" data-range="custom">自訂區間</button>
+          </div>
+          <div class="row" id="customRange" style="display:none; margin-bottom:4px;">
+            <div class="field"><label for="rangeFrom">起始日期</label><input type="date" id="rangeFrom"></div>
+            <div class="field"><label for="rangeTo">結束日期</label><input type="date" id="rangeTo"></div>
+          </div>
+          <div class="hint" id="rangeLabel"></div>
+        </div>
+
+        <div class="card span2">
+          <h2 id="salaryTitle">薪資結算</h2>
+          <div class="grid-3">
+            <div class="stat money"><div class="label">健保申報收入</div><div class="value mono" id="sumInsurance">$0</div></div>
+            <div class="stat"><div class="label">一般自費收入</div><div class="value mono" id="sumGeneral">$0</div></div>
+            <div class="stat"><div class="label">高自費收入</div><div class="value mono" id="sumHigh">$0</div></div>
+          </div>
+          <div class="stat total" style="margin-top:12px;">
+            <div class="label" id="totalLabel">本期預估總所得</div>
+            <div class="value mono" id="sumTotal">$0</div>
+          </div>
+          <div class="hint" id="pointsHint" style="margin-top:10px;"></div>
+        </div>
+
+        <div class="dash-split">
+          <div class="card" id="clinicBreakdownCard" style="display:none;">
+            <h2>各診所小計</h2>
+            <table class="mini">
+              <thead><tr><th>診所</th><th class="num">健保</th><th class="num">自費</th><th class="num">小計</th></tr></thead>
+              <tbody id="clinicBreakdownBody"></tbody>
+            </table>
+          </div>
+          <div class="card">
+            <h2>分類佔比（健保點值）</h2>
+            <div id="catBreakdown"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="dash-right">
+        <div class="card">
+          <div class="flex-between">
+            <h2>紀錄明細</h2>
+            <span class="hint" id="entryCount"></span>
+          </div>
+          <div id="entryList"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== ADD ENTRY ===== -->
+  <section id="view-add" class="view">
+    <div class="card" id="addNoClinic" style="display:none;">
+      <div class="empty-state">
+        <p>你還沒有新增任何診所，請先到「診所」頁面新增服務的診所（設定抽成比例與點值），才能開始記帳。</p>
+        <button type="button" class="btn btn-primary" id="goAddClinic" style="margin-top:6px;">前往新增診所</button>
+      </div>
+    </div>
+
+    <div class="add-main">
+      <div class="card" id="addFormCard">
+        <div id="editBanner" class="edit-banner hidden"><span>正在編輯既有紀錄</span><button type="button" class="btn btn-ghost btn-sm" id="cancelEdit">取消編輯</button></div>
+        <div class="field">
+          <label for="entryClinic">診所</label>
+          <select id="entryClinic"></select>
+        </div>
+        <div class="seg" id="entryTypeSeg">
+          <button type="button" data-type="insurance" class="active">健保申報</button>
+          <button type="button" data-type="general">一般自費</button>
+          <button type="button" data-type="high">高自費</button>
+        </div>
+
+        <div id="form-insurance">
+          <div class="field">
+            <label for="insDate">日期</label>
+            <input type="date" id="insDate">
+          </div>
+          <div class="field search-box">
+            <label for="insCodeSearch">申報代碼／項目名稱</label>
+            <input type="text" id="insCodeSearch" placeholder="輸入代碼或名稱，例如 91004、洗牙、根管" autocomplete="off" autocapitalize="off" spellcheck="false">
+            <div class="suggest" id="insSuggest" style="display:none;"></div>
+          </div>
+          <div class="freq" id="freqChips"></div>
+          <div id="insSelectedInfo" class="hint" style="margin-bottom:12px;"></div>
+          <div class="row">
+            <div class="field"><label for="insQty">數量／件數</label>
+              <div class="stepper"><button type="button" data-step="-1" aria-label="減少">−</button><input type="number" id="insQty" value="1" min="1" step="1" inputmode="numeric"><button type="button" data-step="1" aria-label="增加">＋</button></div>
+            </div>
+            <div class="field"><label for="insPointValue">點值（1點＝？元）</label><input type="number" id="insPointValue" step="0.01" inputmode="decimal"></div>
+          </div>
+          <div class="row">
+            <div class="field"><label for="insCommission">抽成比例（％）</label><input type="number" id="insCommission" step="0.1" inputmode="decimal"></div>
+            <div class="field"><label>&nbsp;</label><div class="stat" style="padding:9px 12px;"><div class="label">預估收入</div><div class="value mono" id="insPreview" style="font-size:18px;">$0</div></div></div>
+          </div>
+          <div class="field"><label for="insNote">備註（選填）</label><input type="text" id="insNote" placeholder="病人代號、備註…"></div>
+          <button type="button" class="btn btn-primary btn-block" id="insSave">儲存健保紀錄</button>
+        </div>
+
+        <div id="form-cash" style="display:none;">
+          <div class="field">
+            <label for="cashDate">日期</label>
+            <input type="date" id="cashDate">
+          </div>
+          <div class="field">
+            <label id="cashAmountLabel" for="cashAmount">自費金額</label>
+            <input type="number" id="cashAmount" placeholder="0" step="1" inputmode="numeric">
+          </div>
+          <div class="row">
+            <div class="field"><label for="cashCommission">抽成比例（％）</label><input type="number" id="cashCommission" step="0.1" inputmode="decimal"></div>
+            <div class="field"><label>&nbsp;</label><div class="stat" style="padding:9px 12px;"><div class="label">預估收入</div><div class="value mono" id="cashPreview" style="font-size:18px;">$0</div></div></div>
+          </div>
+          <div class="field"><label for="cashDesc">項目說明</label><input type="text" id="cashDesc" placeholder="例如：植牙、牙冠、活動假牙…"></div>
+          <button type="button" class="btn btn-primary btn-block" id="cashSave">儲存自費紀錄</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="add-side">
+      <div class="card" id="pickerCard">
+        <h2>瀏覽申報代碼</h2>
+        <div class="chips" id="pickCats"></div>
+        <div class="chips" id="pickSubs"></div>
+        <div class="picker-list" id="pickList"></div>
+      </div>
+      <div class="card" id="recentCard">
+        <h2>這間診所最近的紀錄</h2>
+        <div id="recentList"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== CODES ===== -->
+  <section id="view-codes" class="view">
+    <div class="card">
+      <div class="flex-between" style="margin-bottom:10px;">
+        <h2>健保申報代碼庫</h2>
+        <button type="button" class="btn btn-primary btn-sm" id="openAddCode">＋ 新增代碼</button>
+      </div>
+      <div class="ver-note" id="codeVerNote"></div>
+      <p class="hint" style="margin-bottom:10px;">健保局調整支付點數時，點 ✎ 直接修改點數即可；新增或刪除項目也在這裡操作。已存的紀錄保留當時的點數，不受影響。</p>
+      <input type="text" id="codeSearch" placeholder="搜尋代碼或名稱…" style="margin-bottom:10px;" autocomplete="off">
+      <div class="chips" id="codeCatChips"></div>
+      <div class="chips" id="codeSubChips"></div>
+      <div id="codeList"></div>
+    </div>
+  </section>
+
+  <!-- ===== CLINICS ===== -->
+  <section id="view-clinics" class="view">
+    <div class="card span-all">
+      <div class="flex-between" style="margin-bottom:10px;">
+        <h2>我服務的診所</h2>
+        <button type="button" class="btn btn-primary btn-sm" id="openAddClinic">＋ 新增診所</button>
+      </div>
+      <p class="hint" style="margin-bottom:12px;">每間診所可設定各自的健保抽成、健保點值、一般自費抽成、高自費抽成。新增紀錄時選診所會自動帶入，個別紀錄仍可再手動調整。</p>
+      <div id="clinicList"></div>
+    </div>
+
+    <div class="card" id="syncCard">
+      <div class="flex-between" style="margin-bottom:6px;">
+        <h2>跨裝置同步</h2>
+        <span class="hint" id="cloudStatusInline"></span>
+      </div>
+      <p class="hint" style="margin-bottom:12px;">用你自己的 GitHub 私密 Gist 當雲端：iPhone、iPad、電腦填同一組 Token 與 Gist ID，打開 App 時會自動抓最新資料、存檔時自動上傳。多台裝置各自新增的紀錄會自動合併。</p>
+      <div class="field"><label for="cloudToken">GitHub Token（只需勾選 gist 權限）</label><input type="password" id="cloudToken" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="ghp_…"></div>
+      <div class="field"><label for="cloudGist">Gist ID（可直接貼整段 Gist 網址）</label><input type="text" id="cloudGist" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="例如 3f2a9c…（32 碼）"></div>
+      <div class="row">
+        <button type="button" class="btn btn-primary btn-block" id="cloudConnect">儲存並同步</button>
+        <button type="button" class="btn btn-ghost btn-block" id="cloudSyncNow">立即同步</button>
+      </div>
+      <div class="row" style="margin-top:10px;">
+        <button type="button" class="btn btn-ghost btn-block" id="cloudLink">複製同步連結</button>
+        <button type="button" class="btn btn-danger btn-block" id="cloudDisconnect">取消同步</button>
+      </div>
+      <input type="text" readonly id="cloudLinkBox" class="hidden" style="margin-top:10px;" aria-label="同步連結">
+      <p class="hint">「同步連結」含你的 Token，只傳給自己的另一台裝置（AirDrop／訊息給自己），不要分享給別人。</p>
+      <details class="help">
+        <summary>第一次設定怎麼做？</summary>
+        <ol>
+          <li>GitHub → 右上頭像 → Settings → Developer settings → Personal access tokens → <b>Tokens (classic)</b> → Generate new token (classic)，只勾選 <b>gist</b>，產生後複製 <span class="mono">ghp_…</span> 開頭的 Token。</li>
+          <li>開啟 <span class="mono">gist.github.com</span>，檔名填 <span class="mono">meta.json</span>、內容填 <span class="mono">{}</span>，按 <b>Create secret gist</b>。</li>
+          <li>複製網址最後那串 32 碼（或整段網址），連同 Token 貼到上面，按「儲存並同步」。</li>
+          <li>其他裝置：按「複製同步連結」傳過去開啟，或手動貼同一組 Token 與 Gist ID。</li>
+        </ol>
+      </details>
+    </div>
+
+    <div class="card">
+      <h2>資料備份</h2>
+      <p class="hint" style="margin-bottom:12px;">匯出 JSON 備份檔；匯入時會與現有資料合併，不會覆蓋或刪除目前的紀錄。</p>
+      <div class="row">
+        <button type="button" class="btn btn-ghost btn-block" id="exportData">匯出備份</button>
+        <button type="button" class="btn btn-ghost btn-block" id="importData">匯入備份</button>
+      </div>
+      <input type="file" id="importFile" accept="application/json,.json" style="display:none;">
+    </div>
+  </section>
+
+</main>
+
+<div class="modal-bg" id="codeModalBg">
+  <div class="modal">
+    <h3 id="codeModalTitle">新增代碼</h3>
+    <div class="field"><label for="cmCode">代碼</label><input type="text" id="cmCode" placeholder="例如 91004C" autocapitalize="characters" autocomplete="off"></div>
+    <div class="field"><label for="cmName">項目名稱</label><input type="text" id="cmName" placeholder="例如 牙結石清除－全口"></div>
+    <div class="row">
+      <div class="field"><label for="cmPoints">支付點數</label><input type="number" id="cmPoints" step="1" inputmode="numeric"></div>
+      <div class="field"><label for="cmCategory">分類</label>
+        <select id="cmCategory">
+          <option value="perio">牙周</option>
+          <option value="endo">根管</option>
+          <option value="od">牙體復形</option>
+          <option value="surgery">口腔外科</option>
+          <option value="other">其他</option>
+        </select>
+      </div>
+    </div>
+    <div class="field" id="cmSubField"><label for="cmSub">「其他」的細分類</label>
+      <select id="cmSub"></select>
+    </div>
+    <div class="actions">
+      <button type="button" class="btn btn-ghost" id="cmCancel">取消</button>
+      <button type="button" class="btn btn-primary" id="cmSave">儲存</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-bg" id="clinicModalBg">
+  <div class="modal">
+    <h3 id="clinicModalTitle">新增診所</h3>
+    <div class="field"><label for="clName">診所名稱</label><input type="text" id="clName" placeholder="例如：光燦牙醫"></div>
+    <div class="field">
+      <label>顏色標籤</label>
+      <div class="swatches" id="clSwatches"></div>
+      <input type="hidden" id="clColor">
+    </div>
+    <h3 class="sub-h" style="margin-top:14px;">健保申報</h3>
+    <div class="row">
+      <div class="field"><label for="clInsCommission">抽成比例（％）</label><input type="number" id="clInsCommission" step="0.1" inputmode="decimal"></div>
+      <div class="field"><label for="clPointValue">點值（1點＝？元）</label><input type="number" id="clPointValue" step="0.01" inputmode="decimal"></div>
+    </div>
+    <h3 class="sub-h">自費</h3>
+    <div class="row">
+      <div class="field"><label for="clGeneralCommission">一般自費抽成（％）</label><input type="number" id="clGeneralCommission" step="0.1" inputmode="decimal"></div>
+      <div class="field"><label for="clHighCommission">高自費抽成（％）</label><input type="number" id="clHighCommission" step="0.1" inputmode="decimal"></div>
+    </div>
+    <div class="actions">
+      <button type="button" class="btn btn-ghost" id="clCancel">取消</button>
+      <button type="button" class="btn btn-primary" id="clSave">儲存</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-bg" id="confirmModalBg">
+  <div class="modal">
+    <h3 id="confirmTitle">確認刪除？</h3>
+    <p class="hint" id="confirmBody" style="font-size:13.5px; margin-bottom:6px;"></p>
+    <div class="actions">
+      <button type="button" class="btn btn-ghost" id="confirmCancel">取消</button>
+      <button type="button" class="btn btn-danger" id="confirmOk">刪除</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+(function(){
+  "use strict";
+
+  /* =====================================================================
+     常數與內建代碼表
+     ===================================================================== */
+  const CATS = {
+    perio:   {label:'牙周',    cls:'perio'},
+    endo:    {label:'根管',    cls:'endo'},
+    od:      {label:'牙體復形', cls:'od'},
+    surgery: {label:'口腔外科', cls:'surgery'},
+    other:   {label:'其他',    cls:'other'}
+  };
+  const CAT_COLOR = {perio:'teal', endo:'amber', od:'blue', surgery:'brick', other:'gray'};
+  const SUBS = {exam:'診察費', infect:'感染管制診察', xray:'X光', anes:'麻醉', wound:'創傷處理', path:'病理', plan:'專案計畫'};
+  const CLINIC_COLORS = ['#0F6B5C','#3B6EA5','#B9812E','#AD4430','#6B5CA5','#2F8F8F','#9C4F96','#4C7A3C'];
+  const LEGACY_SETTINGS = { insCommission: 50, pointValue: 0.8, generalCommission: 30, highCommission: 15 };
+
+  // 內建代碼表：來源為「牙醫師實用手冊—健保事務內容（115年2月28日版）」基層院所有標示 v 的項目
+  const CODES_VERSION = '115-02-28';
+  const CODES_VERSION_LABEL = '115 年 2 月版（牙醫全聯會手冊）';
+  const DEFAULTS_STAMP = Date.UTC(2026, 1, 28);
+  const DEFAULT_CODES = [
+  ["00121C","牙科門診診察費（≦20人次）－處方交付特約藥局",230,"other","exam"],
+  ["00122C","牙科門診診察費（≦20人次）－自行調劑或未開處方",230,"other","exam"],
+  ["00123C","牙科門診診察費（＞20人次）－處方交付特約藥局",120,"other","exam"],
+  ["00124C","牙科門診診察費（＞20人次）－自行調劑或未開處方",120,"other","exam"],
+  ["00125C","牙科門診診察費（山地離島）－處方交付特約藥局",260,"other","exam"],
+  ["00126C","牙科門診診察費（山地離島）－自行調劑或未開處方",260,"other","exam"],
+  ["00128C","自閉症、失智症及重度以上身障診察費",520,"other","exam"],
+  ["00301C","中度身障診察費",420,"other","exam"],
+  ["00302C","中度以上精神疾病病人診察費",320,"other","exam"],
+  ["00303C","輕度身障及失能老人診察費",320,"other","exam"],
+  ["00304C","身障轉出至特殊醫療服務計畫院所轉診費",200,"other","exam"],
+  ["00305C","感染管制診察費（≦20人次）－處方交付特約藥局",378,"other","infect"],
+  ["00306C","感染管制診察費（≦20人次）－自行調劑或未開處方",378,"other","infect"],
+  ["00307C","感染管制診察費（＞20人次）－處方交付特約藥局",178,"other","infect"],
+  ["00308C","感染管制診察費（＞20人次）－自行調劑或未開處方",178,"other","infect"],
+  ["00309C","感染管制診察費（山地離島）－處方交付特約藥局",408,"other","infect"],
+  ["00310C","感染管制診察費（山地離島）－自行調劑或未開處方",408,"other","infect"],
+  ["00311C","感染管制診察費－重度身障",678,"other","infect"],
+  ["00312C","感染管制診察費－中度身障",578,"other","infect"],
+  ["00313C","感染管制診察費－中度以上精神疾病",478,"other","infect"],
+  ["00314C","感染管制診察費－輕度身障及失能老人",478,"other","infect"],
+  ["00315C","感染管制診察費－環口全景X光片",658,"other","infect"],
+  ["00316C","感染管制診察費－年度X光片",658,"other","infect"],
+  ["00317C","感染管制診察費－高齲齒罹患率族群年度X光片",658,"other","infect"],
+  ["00318C","感染管制診察費－自閉症失智症極重度身障",778,"other","infect"],
+  ["01271C","環口全景X光片診察",600,"other","xray"],
+  ["01272C","年度X光片診察",600,"other","xray"],
+  ["01273C","高齲齒罹患率族群年度X光片診察",600,"other","xray"],
+  ["25003C","第三級外科病理",1014,"other","path"],
+  ["25004C","第四級外科病理",1741,"other","path"],
+  ["34001C","根尖周X光攝影",80,"other","xray"],
+  ["34002C","咬翼式X光攝影",100,"other","xray"],
+  ["34003C","咬合片X光攝影",120,"other","xray"],
+  ["34004C","齒顎全景X光片攝影",600,"other","xray"],
+  ["48022C","臉部創傷處理－小（＜5cm）",1566,"other","wound"],
+  ["48023C","臉部創傷處理－中（5-10cm）",2515,"other","wound"],
+  ["48024C","臉部創傷處理－大（＞10cm）",3249,"other","wound"],
+  ["48025C","拆線－傷口小於10cm",97,"other","wound"],
+  ["48026C","拆線－傷口10cm以上",303,"other","wound"],
+  ["48028P","深部複雜臉部創傷第二次處理",496,"other","wound"],
+  ["48033C","深部複雜臉部創傷處理－小（＜5cm）",2445,"other","wound"],
+  ["48034C","深部複雜臉部創傷處理－中（5-10cm）",3534,"other","wound"],
+  ["48035C","深部複雜臉部創傷處理－大（＞10cm）",4101,"other","wound"],
+  ["89001C","銀粉充填－單面",450,"od"],
+  ["89002C","銀粉充填－雙面",600,"od"],
+  ["89003C","銀粉充填－三面",750,"od"],
+  ["89004C","前牙複合樹脂充填－單面",500,"od"],
+  ["89005C","前牙複合樹脂充填－雙面",650,"od"],
+  ["89006C","覆髓",140,"od"],
+  ["89007C","釘強化術（每支）",500,"od"],
+  ["89008C","後牙複合樹脂充填－單面",600,"od"],
+  ["89009C","後牙複合樹脂充填－雙面",800,"od"],
+  ["89010C","後牙複合樹脂充填－三面",1000,"od"],
+  ["89011C","玻璃離子體充填",400,"od"],
+  ["89012C","前牙三面複合樹脂充填",1050,"od"],
+  ["89013C","複合體充填",1200,"od"],
+  ["89014C","前牙雙鄰接面複合樹脂充填",1200,"od"],
+  ["89015C","後牙雙鄰接面複合樹脂充填",1450,"od"],
+  ["89088C","牙體復形轉診費",200,"od"],
+  ["89101C","特殊狀況銀粉充填－單面",450,"od"],
+  ["89102C","特殊狀況銀粉充填－雙面",600,"od"],
+  ["89103C","特殊狀況銀粉充填－三面",750,"od"],
+  ["89104C","特殊狀況前牙複合樹脂充填－單面",500,"od"],
+  ["89105C","特殊狀況前牙複合樹脂充填－雙面",650,"od"],
+  ["89108C","特殊狀況後牙複合樹脂充填－單面",600,"od"],
+  ["89109C","特殊狀況後牙複合樹脂充填－雙面",800,"od"],
+  ["89110C","特殊狀況後牙複合樹脂充填－三面",1000,"od"],
+  ["89111C","特殊狀況之玻璃離子體充填",400,"od"],
+  ["89112C","特殊狀況之前牙三面複合樹脂充填",1050,"od"],
+  ["89113C","特殊狀況之複合體充填",1200,"od"],
+  ["89114C","特殊狀況之前牙雙鄰接面複合樹脂充填",1200,"od"],
+  ["89115C","特殊狀況之後牙雙鄰接面複合樹脂充填",1450,"od"],
+  ["89204C","高風險疾病複雜性前牙複合體充填－單面",900,"od"],
+  ["89205C","高風險疾病複雜性前牙複合體充填－雙面",1050,"od"],
+  ["89208C","高風險疾病複雜性後牙複合體充填－單面",1000,"od"],
+  ["89209C","高風險疾病複雜性後牙複合體充填－雙面",1200,"od"],
+  ["89210C","高風險疾病複雜性後牙複合體充填－三面",1400,"od"],
+  ["89212C","高風險疾病複雜性前牙三面複合體充填",1450,"od"],
+  ["89214C","高風險疾病複雜性前牙雙鄰接面複合體充填",1600,"od"],
+  ["89215C","高風險疾病複雜性後牙雙鄰接面複合體充填",1850,"od"],
+  ["90001C","恆牙根管治療（單根）",1240,"endo"],
+  ["90002C","恆牙根管治療（雙根）",2440,"endo"],
+  ["90003C","恆牙根管治療（三根）",4530,"endo"],
+  ["90004C","齒內治療緊急處理",300,"endo"],
+  ["90005C","乳牙斷髓處理",830,"endo"],
+  ["90006C","去除縫成牙冠",240,"endo"],
+  ["90007C","去除全鑲面牙冠",800,"endo"],
+  ["90008C","去除釘柱（每一釘柱）",1235,"endo"],
+  ["90010C","根尖逆充填術",900,"endo"],
+  ["90011C","牙齒再植術",1000,"endo"],
+  ["90012C","橡皮障防濕裝置",150,"endo"],
+  ["90013C","根尖成形術或根尖生成術－前牙",500,"endo"],
+  ["90014C","根尖成形術或根尖生成術－後牙",1000,"endo"],
+  ["90015C","根管開擴及清創",630,"endo"],
+  ["90016C","乳牙根管治療",1040,"endo"],
+  ["90017C","恆牙斷髓處理",600,"endo"],
+  ["90018C","乳牙多根管治療",1720,"endo"],
+  ["90019C","恆牙根管治療（四根）",6000,"endo"],
+  ["90020C","恆牙根管治療（五根（含）以上）",7500,"endo"],
+  ["90021C","特殊狀況－保護性肢體制約",300,"endo"],
+  ["90088C","根管治療轉診費",200,"endo"],
+  ["90091C","難症特別處理－大臼齒C型根管",1000,"endo"],
+  ["90092C","難症特別處理－有額外根管",1000,"endo"],
+  ["90093C","難症特別處理－根管彎曲鈣化或器械斷折",1000,"endo"],
+  ["90094C","難症特別處理－根管重新治療（阻塞根管）",1500,"endo"],
+  ["90095C","多根管根管治療（雙根管）",1600,"endo"],
+  ["90096C","多根管根管治療（三根管）",2400,"endo"],
+  ["90097C","多根管根管治療（四根管）",3200,"endo"],
+  ["90098C","多根管根管治療（五根管以上）",4000,"endo"],
+  ["90112C","特殊狀況橡皮障防濕裝置",250,"endo"],
+  ["91001C","牙周緊急處置",150,"perio"],
+  ["91002C","牙周敷料（每次）",120,"perio"],
+  ["91003C","牙結石清除－局部",165,"perio"],
+  ["91004C","牙結石清除－全口",660,"perio"],
+  ["91005C","口乾症牙結石清除－全口",720,"perio"],
+  ["91006C","齒齦下刮除術（含牙根整平）－全口",3200,"perio"],
+  ["91007C","齒齦下刮除術（含牙根整平）－1/2顎",800,"perio"],
+  ["91008C","齒齦下刮除術（含牙根整平）－局部（三齒以內）",400,"perio"],
+  ["91011C","牙齦切除術－局部（三齒以內）",940,"perio"],
+  ["91012C","牙齦切除術－1/3顎",1540,"perio"],
+  ["91013C","牙齦切除術（根管或復形合併）",360,"perio"],
+  ["91014C","牙周暨齲齒控制基本處置",100,"perio"],
+  ["91015C","特定牙周保存治療－全口9-15顆",2120,"perio"],
+  ["91016C","特定牙周保存治療－全口4-8顆",1120,"perio"],
+  ["91017C","懷孕婦女牙結石清除－全口",920,"perio"],
+  ["91018C","牙周病支持性治療",1120,"perio"],
+  ["91019C","懷孕婦女牙周緊急處置",500,"perio"],
+  ["91020C","牙菌斑去除照護",200,"perio"],
+  ["91021C","牙周病統合治療－第一階段",1800,"perio"],
+  ["91022C","牙周病統合治療－第二階段",5000,"perio"],
+  ["91023C","牙周病統合治療－第三階段",3200,"perio"],
+  ["91088C","牙周病轉診費",200,"perio"],
+  ["91089C","糖尿病病人牙結石清除－全口",820,"perio"],
+  ["91090C","高風險疾病病人牙結石清除－全口",820,"perio"],
+  ["91091C","特定牙周保存治療－全口1-3顆",600,"perio"],
+  ["91103C","特殊狀況牙結石清除－局部",165,"perio"],
+  ["91104C","特殊狀況牙結石清除－全口",660,"perio"],
+  ["91114C","特殊牙周暨齲齒控制基本處置",250,"perio"],
+  ["92001C","非特定局部治療",50,"surgery"],
+  ["92002C","齒間暫時固定術，每齒",100,"surgery"],
+  ["92003C","口內切開排膿",540,"surgery"],
+  ["92004C","口外切開排膿",3030,"surgery"],
+  ["92005C","拆線",50,"surgery"],
+  ["92006C","固定鋼線移除",500,"surgery"],
+  ["92009C","去除齒列夾板",360,"surgery"],
+  ["92012C","拔牙後特別處理",190,"surgery"],
+  ["92013C","簡單性拔牙",540,"surgery"],
+  ["92014C","複雜性拔牙",930,"surgery"],
+  ["92015C","單純齒切除術",2760,"surgery"],
+  ["92016C","複雜齒切除術",4330,"surgery"],
+  ["92017C","囊腫摘除術－小（0.5-2cm）",3030,"surgery"],
+  ["92027C","齦蓋切除術",540,"surgery"],
+  ["92028C","繫帶切除術－簡單法",440,"surgery"],
+  ["92029C","繫帶切除術－Z字法",600,"surgery"],
+  ["92030C","前牙根尖切除術",1830,"surgery"],
+  ["92031C","小臼齒根尖切除術",2830,"surgery"],
+  ["92032C","大臼齒根尖切除術",4030,"surgery"],
+  ["92033C","牙齒切半術或牙根切斷術",1530,"surgery"],
+  ["92041C","齒槽骨成形術（二分之一顎以內）",600,"surgery"],
+  ["92042C","齒槽骨成形術（二分之一顎以上）",1100,"surgery"],
+  ["92043C","顳顎關節脫臼整復－無固定",340,"surgery"],
+  ["92050C","埋伏齒露出手術",1000,"surgery"],
+  ["92055C","乳牙拔除",290,"surgery"],
+  ["92056C","骨瘤切除術－＜1cm",5040,"surgery"],
+  ["92057C","骨瘤切除術－1-2cm",10040,"surgery"],
+  ["92058C","骨瘤切除術－＞2cm",15040,"surgery"],
+  ["92059C","手術去除陷入上顎竇內牙齒或異物",6040,"surgery"],
+  ["92062C","唾液腺管沖洗",150,"surgery"],
+  ["92063C","手術拔除深部阻生齒",9000,"surgery"],
+  ["92064C","手術去除解剖間隙內異物或牙齒",10540,"surgery"],
+  ["92066C","特定局部治療",50,"surgery"],
+  ["92071C","簡單性口內切開排膿",240,"surgery"],
+  ["92072C","口乾症塗氟",500,"surgery"],
+  ["92073C","口腔黏膜難症特別處置",600,"surgery"],
+  ["92088C","口腔顎面外科轉診費",200,"surgery"],
+  ["92090C","定期性口腔癌與癌前病變追蹤治療",600,"surgery"],
+  ["92091C","非定期性口腔癌與癌前病變追蹤治療",400,"surgery"],
+  ["92092C","乳牙複雜性拔牙",590,"surgery"],
+  ["92094C","週六日及國定假日牙醫門診急症疼痛處理（每次門診）",800,"surgery"],
+  ["92095C","顎顏面骨壞死術後傷口照護",600,"surgery"],
+  ["92096C","牙齒外傷急症處理",4976,"surgery"],
+  ["92097C","顱顎關節障礙特殊檢查－初診",1000,"surgery"],
+  ["92098C","顱顎關節障礙特殊檢查－複診",500,"surgery"],
+  ["92133C","週日及國定假日牙醫門診處理（每次門診）",800,"surgery"],
+  ["96001C","牙科局部麻醉",120,"other","anes"],
+  ["96002C","笑氣鎮痛",200,"other","anes"],
+  ["96003C","朦朧麻醉",140,"other","anes"],
+  ["96004C","靜脈或肌肉麻醉",1598,"other","anes"],
+  ["96017C","吸入全身麻醉（半開放/半閉鎖面罩）－未滿2小時",3582,"other","anes"],
+  ["96018C","吸入全身麻醉（半開放/半閉鎖面罩）－2-4小時，每增加30分",895,"other","anes"],
+  ["96019C","吸入全身麻醉（半開放/半閉鎖面罩）－4小時以上，每增加30分",1119,"other","anes"],
+  ["96020C","氣管內插管全身麻醉（半閉鎖/閉鎖循環）－未滿2小時",3917,"other","anes"],
+  ["96021C","氣管內插管全身麻醉－2-4小時，每增加30分",895,"other","anes"],
+  ["96022C","氣管內插管全身麻醉－超過4小時，每增加30分",1119,"other","anes"],
+  ["96029C","氣管內插管全身麻醉－未滿2小時（影像導引，疑似或確診飛沫傳染病）",5155,"other","anes"],
+  ["96030C","氣管內插管全身麻醉－未滿2小時（影像導引，困難氣道或緊急）",4597,"other","anes"],
+  ["P3601C","特定疾病病人牙科就醫安全",100,"other","plan"],
+  ["P7101C","青少年齲齒控制照護處置",300,"other","plan"],
+  ["P7102C","青少年齲齒氟化物治療",500,"other","plan"],
+  ["P7302C","齲齒經驗高風險病人氟化物治療",500,"other","plan"],
+  ["P7303C","超音波根管沖洗",100,"endo"]
+];
+  const DEFAULT_SET = new Set(DEFAULT_CODES.map(r => r[0]));
+  const ALIASES = {'洗牙':'牙結石清除','刮牙結石':'牙結石清除','補牙':'充填','抽神經':'根管','根管':'根管','拔牙':'拔牙','麻藥':'麻醉','刮牙根':'齒齦下刮除','全景':'全景','咬翼':'咬翼','智齒':'阻生','塗氟':'氟化物','牙周':'牙周'};
+
+  const LS = 'dental_ledger:';
+  const GIST_API = 'https://api.github.com/gists/';
+
+  /* =====================================================================
+     小工具
+     ===================================================================== */
+  const $  = sel => document.querySelector(sel);
+  const $$ = sel => Array.from(document.querySelectorAll(sel));
+  const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const fmt = n => '$' + Math.round(n).toLocaleString('en-US');
+  const pad = n => String(n).padStart(2, '0');
+  const ymd = d => `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;   // 本地日期（避免 UTC 日期差一天）
+  const todayStr = () => ymd(new Date());
+  const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+  const isWide = () => window.matchMedia('(min-width:768px)').matches;
+  const codeByCode = c => state.codes.find(x => x.code === c);
+  const clinicById = id => state.clinics.find(c => c.id === id);
+  const incomeOfIns  = e => e.points * e.qty * e.pointValue * (e.commission / 100);
+  const incomeOfCash = e => e.amount * (e.commission / 100);
+
+  let state = { codes: [], clinics: [], entries: [], cash: [], tomb: [] };
+
+  let toastTimer;
+  function toast(msg){
+    const t = $('#toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => t.classList.remove('show'), 2200);
+  }
+
+  /* =====================================================================
+     本機儲存
+     ===================================================================== */
+  function lsGet(k, fb){ try{ const r = localStorage.getItem(LS + k); return r === null ? fb : JSON.parse(r); }catch(e){ return fb; } }
+  function lsSet(k, v){ try{ localStorage.setItem(LS + k, JSON.stringify(v)); return true; }catch(e){ return false; } }
+
+  function persistLocal(){
+    const ok = ['codes','clinics','entries','cash','tomb'].map(k => lsSet(k, state[k])).every(Boolean);
+    if(!ok) toast('這個瀏覽器無法儲存資料（可能是無痕模式）');
+  }
+  function persist(){
+    persistLocal();
+    if(cloudOn()){ cloud.dirty = true; saveCloud(); scheduleSync(); }
+  }
+  function touch(r){ r.updatedAt = Date.now(); return r; }
+  function addTomb(id){
+    state.tomb = state.tomb.filter(t => t.id !== id);
+    state.tomb.push({ id, at: Date.now() });
+  }
+
+  /* =====================================================================
+     合併（多台裝置各自新增 → 以 id 聯集；較新的 updatedAt 勝出；刪除用墓碑記錄）
+     ===================================================================== */
+  const keyOf = (col, r) => col === 'codes' ? String(r.code).toUpperCase() : r.id;
+  function mergeStates(local, remote){
+    const tomb = new Map();
+    for(const t of [...(local.tomb || []), ...(remote.tomb || [])]){
+      if(!t || !t.id) continue;
+      if(!tomb.has(t.id) || tomb.get(t.id) < t.at) tomb.set(t.id, t.at);
+    }
+    const out = {};
+    for(const col of ['codes','clinics','entries','cash']){
+      const m = new Map();
+      for(const r of [...(remote[col] || []), ...(local[col] || [])]){   // 本機放後面：時間相同時以本機為準
+        if(!r || (col === 'codes' ? !r.code : !r.id)) continue;
+        const k = keyOf(col, r), cur = m.get(k);
+        if(!cur || (r.updatedAt || 0) >= (cur.updatedAt || 0)) m.set(k, r);
+      }
+      out[col] = [...m.entries()].filter(([k, r]) => {
+        const t = tomb.get(k);
+        return !(t !== undefined && t >= (r.updatedAt || 0));
+      }).map(([, r]) => r);
+    }
+    const keep = Date.now() - 365 * 864e5;
+    out.tomb = [...tomb].filter(([, at]) => at > keep).map(([id, at]) => ({ id, at }));
+    return out;
+  }
+  function applyMerged(m){
+    state.codes = m.codes; state.clinics = m.clinics; state.entries = m.entries; state.cash = m.cash; state.tomb = m.tomb;
+    normalizeState();
+    persistLocal();
+  }
+
+  /* =====================================================================
+     資料整理與代碼表更新
+     ===================================================================== */
+  function normalizeState(){
+    // 代碼：以代碼本身當 id，去除重複
+    const m = new Map();
+    for(const c of state.codes){
+      if(!c || !c.code) continue;
+      c.code = String(c.code).trim();
+      const k = c.code.toUpperCase();
+      c.id = k;
+      if(c.updatedAt == null) c.updatedAt = DEFAULT_SET.has(c.code) ? 0 : Date.now();
+      const cur = m.get(k);
+      if(!cur || (c.updatedAt || 0) >= (cur.updatedAt || 0)) m.set(k, c);
+    }
+    state.codes = [...m.values()];
+    // 舊版沒有診所的紀錄 → 歸到固定 id 的「診所 1」（兩台裝置不會各建一份）
+    const orphans = [...state.entries, ...state.cash].filter(e => !e.clinicId);
+    if(orphans.length){
+      let c = clinicById('legacy-clinic');
+      if(!c){
+        const s = lsGet('settings', null) || LEGACY_SETTINGS;
+        c = { id:'legacy-clinic', name:'診所 1', color:CLINIC_COLORS[0],
+              insCommission:s.insCommission, pointValue:s.pointValue,
+              generalCommission:s.generalCommission, highCommission:s.highCommission, updatedAt:Date.now() };
+        state.clinics.push(c);
+      }
+      orphans.forEach(e => { e.clinicId = c.id; e.clinicName = c.name; e.updatedAt = Date.now(); });
+    }
+  }
+
+  function applyDefaultCodes(){
+    let added = 0, updated = 0;
+    const byCode = new Map(state.codes.map(c => [c.code.toUpperCase(), c]));
+    const dead = new Set(state.tomb.map(t => t.id));
+    for(const [code, name, points, cat, sub] of DEFAULT_CODES){
+      const cur = byCode.get(code);
+      if(!cur){
+        if(dead.has(code)) continue;                       // 使用者刻意刪除過，不再加回
+        state.codes.push({ id:code, code, name, points, cat, sub:sub || '', updatedAt:DEFAULTS_STAMP });
+        added++;
+      } else if((cur.updatedAt || 0) <= DEFAULTS_STAMP){   // 使用者之後沒改過，才套用內建值
+        if(cur.name !== name || cur.points !== points || cur.cat !== cat || (cur.sub || '') !== (sub || '')){
+          Object.assign(cur, { name, points, cat, sub:sub || '' });
+          updated++;
+        }
+        cur.updatedAt = DEFAULTS_STAMP;
+      }
+    }
+    return { added, updated };
+  }
+  const isCustomCode = c => (c.updatedAt || 0) > DEFAULTS_STAMP;
+
+  /* =====================================================================
+     雲端同步（GitHub 私密 Gist）
+     meta.json：診所、自訂/修改過的代碼、刪除墓碑　entries-YYYY-MM.json：每月紀錄
+     ===================================================================== */
+  let cloud = { token:'', gist:'', lastSync:null, dirty:false, err:'' };
+  const cloudOn = () => !!(cloud.token && cloud.gist);
+  function loadCloud(){ const c = lsGet('cloud', null); if(c) cloud = { ...cloud, ...c }; }
+  function saveCloud(){ lsSet('cloud', cloud); }
+
+  const KEYS = {id:'i', clinicId:'c', clinicName:'cn', date:'d', code:'k', name:'nm', cat:'g', sub:'sg', points:'p', qty:'q', pointValue:'v', commission:'m', note:'n', updatedAt:'u', amount:'a', type:'t', desc:'ds'};
+  const REV = Object.fromEntries(Object.entries(KEYS).map(([a, b]) => [b, a]));
+  const KEY_ORDER = Object.keys(KEYS);
+  function pack(o){ const r = {}; for(const k of KEY_ORDER){ const v = o[k]; if(v !== undefined && v !== null && v !== '') r[KEYS[k]] = v; } return r; }
+  function unpack(o){ const r = {}; for(const k in o) r[REV[k] || k] = o[k]; return r; }
+  const pick = (o, fields) => { const r = {}; for(const f of fields){ if(o[f] !== undefined && o[f] !== null && o[f] !== '') r[f] = o[f]; } return r; };
+  const CLINIC_F = ['id','name','color','insCommission','pointValue','generalCommission','highCommission','updatedAt'];
+  const CODE_F = ['code','name','points','cat','sub','updatedAt'];
+  const byI = (a, b) => a.i < b.i ? -1 : a.i > b.i ? 1 : 0;
+
+  function buildFiles(s){
+    const files = {};
+    files['meta.json'] = JSON.stringify({
+      v: 1,
+      clinics: s.clinics.map(c => pick(c, CLINIC_F)).sort((a, b) => a.id < b.id ? -1 : 1),
+      codes: s.codes.filter(isCustomCode).map(c => pick(c, CODE_F)).sort((a, b) => a.code < b.code ? -1 : 1),
+      tomb: s.tomb.slice().sort((a, b) => a.id < b.id ? -1 : 1)
+    });
+    const months = {};
+    const add = (key, r) => { const m = /^\d{4}-\d{2}/.test(r.date || '') ? r.date.slice(0, 7) : 'misc'; (months[m] = months[m] || { e:[], c:[] })[key].push(pack(r)); };
+    s.entries.forEach(r => add('e', r));
+    s.cash.forEach(r => add('c', r));
+    for(const m of Object.keys(months).sort()){
+      months[m].e.sort(byI); months[m].c.sort(byI);
+      files[`entries-${m}.json`] = JSON.stringify(months[m]);
+    }
+    return files;
+  }
+
+  async function readGistFile(f){
+    if(f.truncated || f.content == null){
+      const r = await fetch(f.raw_url, { cache:'no-store' });
+      if(!r.ok) throw new Error('raw ' + r.status);
+      return await r.text();
+    }
+    return f.content;
+  }
+  async function parseGist(g){
+    const remote = { clinics:[], codes:[], tomb:[], entries:[], cash:[] };
+    const raw = {};
+    for(const [name, f] of Object.entries(g.files || {})){
+      if(name !== 'meta.json' && !/^entries-.+\.json$/.test(name)) continue;
+      const text = await readGistFile(f);
+      raw[name] = text;
+      let j;
+      try{ j = JSON.parse(text.trim() === '' ? '{}' : text); }catch(e){ throw new Error('雲端檔案 ' + name + ' 格式錯誤'); }
+      if(name === 'meta.json'){
+        remote.clinics = j.clinics || []; remote.codes = j.codes || []; remote.tomb = j.tomb || [];
+      } else {
+        (j.e || []).forEach(o => remote.entries.push(unpack(o)));
+        (j.c || []).forEach(o => remote.cash.push(unpack(o)));
+      }
+    }
+    return { remote, raw };
+  }
+  const ghHeaders = () => ({ 'Authorization': 'Bearer ' + cloud.token, 'Accept': 'application/vnd.github+json' });
+
+  let syncing = false, again = false, lastSyncAt = 0, syncTimer = null;
+  function scheduleSync(ms){
+    if(!cloudOn()) return;
+    clearTimeout(syncTimer);
+    syncTimer = setTimeout(() => syncNow(), ms == null ? 900 : ms);
+  }
+  async function syncNow(){
+    if(!cloudOn()) return false;
+    if(syncing){ again = true; return false; }
+    syncing = true; setBadge('syncing');
+    let ok = false;
+    try{
+      const res = await fetch(GIST_API + cloud.gist, { headers: ghHeaders(), cache:'no-store' });
+      if(res.status === 401) throw new Error('Token 無效或已過期');
+      if(res.status === 403 || res.status === 429) throw new Error('GitHub 暫時拒絕請求（權限不足或次數過多）');
+      if(res.status === 404) throw new Error('找不到這個 Gist（請確認 ID 與 Token 屬於同一個帳號）');
+      if(!res.ok) throw new Error('GitHub 回應 ' + res.status);
+      const g = await res.json();
+      const { remote, raw } = await parseGist(g);
+      applyMerged(mergeStates(state, remote));
+      const want = buildFiles(state), patch = {};
+      for(const [n, c] of Object.entries(want)){ if(!raw[n] || raw[n].trim() !== c) patch[n] = { content: c }; }
+      if(Object.keys(patch).length){
+        const r2 = await fetch(GIST_API + cloud.gist, {
+          method:'PATCH', headers:{ ...ghHeaders(), 'Content-Type':'application/json' },
+          body: JSON.stringify({ files: patch })
+        });
+        if(!r2.ok) throw new Error('上傳失敗（GitHub 回應 ' + r2.status + '）');
+      }
+      cloud.lastSync = Date.now(); cloud.dirty = false; cloud.err = ''; saveCloud();
+      lastSyncAt = Date.now(); ok = true;
+      setBadge('ok'); renderAll();
+    }catch(e){
+      console.error('sync failed', e);
+      cloud.err = (e && e.message) || '同步失敗';
+      saveCloud(); setBadge('error');
+      if(!navigator.onLine) cloud.err = '目前沒有網路連線';
+    }finally{
+      syncing = false;
+      if(again){ again = false; scheduleSync(400); }
+    }
+    renderCloudForm();
+    return ok;
+  }
+
+  function setBadge(status){
+    const el = $('#syncBadge'), tx = $('#syncText');
+    if(!cloudOn()){ el.dataset.s = 'off'; tx.textContent = '未設定同步'; el.title = '點一下前往設定跨裝置同步'; return; }
+    el.dataset.s = status;
+    if(status === 'syncing') tx.textContent = '同步中…';
+    else if(status === 'error'){ tx.textContent = '同步失敗'; el.title = cloud.err || ''; }
+    else {
+      const t = cloud.lastSync ? new Date(cloud.lastSync) : null;
+      tx.textContent = t ? `已同步 ${pad(t.getHours())}:${pad(t.getMinutes())}` : '已連線';
+      el.title = '點一下立即同步';
+    }
+  }
+  $('#syncBadge').addEventListener('click', async () => {
+    if(!cloudOn()){ goTo('clinics'); return; }
+    const ok = await syncNow();
+    toast(ok ? '已同步' : '同步失敗：' + (cloud.err || ''));
+  });
+  document.addEventListener('visibilitychange', () => {
+    if(document.visibilityState === 'visible' && cloudOn() && Date.now() - lastSyncAt > 20000) syncNow();
+  });
+  window.addEventListener('pageshow', e => { if(e.persisted && cloudOn()) syncNow(); });
+  window.addEventListener('online', () => { if(cloudOn()) syncNow(); });
+
+  /* ---- 同步設定介面 ---- */
+  function renderCloudForm(){
+    $('#cloudToken').value = cloud.token || '';
+    $('#cloudGist').value = cloud.gist || '';
+    const st = $('#cloudStatusInline');
+    if(!cloudOn()) st.textContent = '未設定';
+    else if(cloud.err) st.textContent = '⚠ ' + cloud.err;
+    else st.textContent = cloud.lastSync ? '上次同步 ' + new Date(cloud.lastSync).toLocaleString('zh-TW', { hour12:false }) : '已設定';
+    st.style.color = cloud.err ? 'var(--danger)' : '';
+    setBadge(syncing ? 'syncing' : (cloud.err ? 'error' : 'ok'));
+  }
+  const parseGistId = s => ((s || '').match(/[0-9a-f]{20,40}/i) || [''])[0];
+  $('#cloudConnect').addEventListener('click', async () => {
+    const token = $('#cloudToken').value.trim(), gist = parseGistId($('#cloudGist').value);
+    if(!token || !gist){ toast('請填入 Token 與 Gist ID'); return; }
+    cloud.token = token; cloud.gist = gist; cloud.err = ''; saveCloud();
+    toast('開始同步…');
+    const ok = await syncNow();
+    toast(ok ? '同步完成' : '同步失敗：' + (cloud.err || ''));
+  });
+  $('#cloudSyncNow').addEventListener('click', async () => {
+    if(!cloudOn()){ toast('請先儲存 Token 與 Gist ID'); return; }
+    const ok = await syncNow();
+    toast(ok ? '同步完成' : '同步失敗：' + (cloud.err || ''));
+  });
+  $('#cloudDisconnect').addEventListener('click', () => {
+    confirmAction('取消跨裝置同步？', '只會清除這台裝置上的同步設定，不會刪除雲端或本機已存的資料。', () => {
+      cloud = { token:'', gist:'', lastSync:null, dirty:false, err:'' };
+      saveCloud(); renderCloudForm(); toast('已取消同步設定');
+    }, '取消同步');
+  });
+  $('#cloudLink').addEventListener('click', async () => {
+    if(!cloudOn()){ toast('請先儲存 Token 與 Gist ID'); return; }
+    const payload = btoa(unescape(encodeURIComponent(JSON.stringify({ t: cloud.token, g: cloud.gist })))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+    const link = location.origin + location.pathname + '#sync=' + payload;
+    const box = $('#cloudLinkBox');
+    box.value = link; box.classList.remove('hidden');
+    try{ await navigator.clipboard.writeText(link); toast('已複製同步連結'); }
+    catch(e){ box.focus(); box.select(); toast('請長按連結並拷貝'); }
+  });
+  function consumeSyncHash(){
+    const m = location.hash.match(/^#sync=([A-Za-z0-9_\-]+)/);
+    if(!m) return false;
+    try{
+      const j = JSON.parse(decodeURIComponent(escape(atob(m[1].replace(/-/g, '+').replace(/_/g, '/')))));
+      if(j && j.t && j.g){ cloud.token = j.t; cloud.gist = j.g; cloud.err = ''; saveCloud(); }
+    }catch(e){ console.error('bad sync link', e); }
+    history.replaceState(null, '', location.pathname + location.search);
+    return true;
+  }
+
+  /* =====================================================================
+     頁籤
+     ===================================================================== */
+  $$('nav.tabs button').forEach(btn => btn.addEventListener('click', () => goTo(btn.dataset.view)));
+  function goTo(view){
+    $$('nav.tabs button').forEach(b => b.classList.toggle('active', b.dataset.view === view));
+    $$('.view').forEach(v => v.classList.toggle('active', v.id === 'view-' + view));
+    if(view === 'dash') renderDash();
+    if(view === 'codes') renderCodes();
+    if(view === 'clinics'){ renderClinics(); renderCloudForm(); }
+    if(view === 'add') prepAddView();
+    window.scrollTo(0, 0);
+  }
+  $('#goAddClinic').addEventListener('click', () => goTo('clinics'));
+
+  function renderAll(){
+    renderDash(); renderCodes(); renderClinics(); refreshClinicOptions(); renderFreq(); renderPicker(); renderRecent(); renderCloudForm();
+  }
+
+  /* =====================================================================
+     新增紀錄
+     ===================================================================== */
+  let entryType = 'insurance';
+  let selectedCode = null;
+  let editingInsId = null, editingCashId = null;
+  const insSearch = $('#insCodeSearch');
+
+  $$('#entryTypeSeg button').forEach(btn => btn.addEventListener('click', () => setEntryType(btn.dataset.type)));
+  function setEntryType(type){
+    entryType = type;
+    $$('#entryTypeSeg button').forEach(b => b.classList.toggle('active', b.dataset.type === type));
+    $('#form-insurance').style.display = type === 'insurance' ? '' : 'none';
+    $('#form-cash').style.display = type === 'insurance' ? 'none' : '';
+    $('#pickerCard').classList.toggle('hidden', type !== 'insurance');
+    applyClinicDefaults();
+  }
+
+  function refreshClinicOptions(){
+    const sel = $('#entryClinic'), prev = sel.value || lsGet('lastClinic', '');
+    sel.innerHTML = state.clinics.map(c => `<option value="${esc(c.id)}">${esc(c.name)}</option>`).join('');
+    if(prev && state.clinics.some(c => c.id === prev)) sel.value = prev;
+    else if(state.clinics[0]) sel.value = state.clinics[0].id;
+  }
+  function prepAddView(){
+    const none = state.clinics.length === 0;
+    $('#addNoClinic').style.display = none ? '' : 'none';
+    $('.add-main').style.display = none ? 'none' : '';
+    $('.add-side').style.display = none ? 'none' : '';
+    if(none) return;
+    refreshClinicOptions();
+    if(!$('#insDate').value) $('#insDate').value = todayStr();
+    if(!$('#cashDate').value) $('#cashDate').value = todayStr();
+    if(!editingInsId && !editingCashId) applyClinicDefaults();
+    $('#pickerCard').classList.toggle('hidden', entryType !== 'insurance');
+    renderFreq(); renderPicker(); renderRecent();
+  }
+  $('#entryClinic').addEventListener('change', () => {
+    lsSet('lastClinic', $('#entryClinic').value);
+    applyClinicDefaults(); renderRecent();
+  });
+
+  function applyClinicDefaults(){
+    const c = clinicById($('#entryClinic').value);
+    if(!c) return;
+    if(entryType === 'insurance'){
+      $('#insPointValue').value = c.pointValue;
+      $('#insCommission').value = c.insCommission;
+      updateInsPreview();
+    } else {
+      $('#cashAmountLabel').textContent = entryType === 'high' ? '高自費金額' : '一般自費金額';
+      $('#cashCommission').value = entryType === 'high' ? c.highCommission : c.generalCommission;
+      updateCashPreview();
+    }
+  }
+
+  /* ---- 找代碼 ---- */
+  function matchCode(c, q){
+    if(!q) return true;
+    const hay = (c.code + ' ' + c.name).toLowerCase();
+    if(hay.includes(q)) return true;
+    for(const k of Object.keys(ALIASES)){ if(q.includes(k.toLowerCase()) && c.name.includes(ALIASES[k])) return true; }
+    return false;
+  }
+  function chooseCode(code){
+    const c = codeByCode(code);
+    if(!c) return;
+    selectedCode = c;
+    insSearch.value = c.code + ' ' + c.name;
+    showSelectedInfo();
+    $('#insSuggest').style.display = 'none';
+    updateInsPreview(); renderPicker();
+  }
+  function showSelectedInfo(){
+    if(!selectedCode){ $('#insSelectedInfo').textContent = ''; return; }
+    const s = selectedCode, sub = s.sub ? ` <span class="badge other">${esc(SUBS[s.sub] || s.sub)}</span>` : '';
+    $('#insSelectedInfo').innerHTML = `<span class="badge ${CATS[s.cat].cls}">${CATS[s.cat].label}</span>${sub} 支付點數：<b>${esc(s.points)}</b> 點／件`;
+  }
+  insSearch.addEventListener('input', () => {
+    const q = insSearch.value.trim().toLowerCase();
+    selectedCode = null; showSelectedInfo(); updateInsPreview();
+    const box = $('#insSuggest');
+    renderPicker();
+    if(!q){ box.style.display = 'none'; return; }
+    const matches = state.codes.filter(c => matchCode(c, q)).sort((a, b) => a.code.localeCompare(b.code)).slice(0, 30);
+    box.innerHTML = matches.length
+      ? matches.map(c => `<div class="opt" data-code="${esc(c.code)}"><span class="code">${esc(c.code)}</span>${esc(c.name)} <span class="hint">· ${esc(c.points)}點</span></div>`).join('')
+      : '<div class="empty">找不到符合的代碼，可到「代碼庫」新增</div>';
+    box.style.display = 'block';
+  });
+  $('#insSuggest').addEventListener('click', e => {
+    const opt = e.target.closest('.opt');
+    if(opt && opt.dataset.code) chooseCode(opt.dataset.code);
+  });
+  document.addEventListener('click', e => { if(!e.target.closest('.search-box')) $('#insSuggest').style.display = 'none'; });
+
+  /* ---- 常用代碼 ---- */
+  function shortName(n){ return n.length > 9 ? n.slice(0, 9) + '…' : n; }
+  function renderFreq(){
+    const el = $('#freqChips');
+    const cnt = new Map();
+    [...state.entries].sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0)).slice(0, 400).forEach(e => cnt.set(e.code, (cnt.get(e.code) || 0) + 1));
+    let top = [...cnt.entries()].sort((a, b) => b[1] - a[1]).map(x => x[0]).filter(codeByCode).slice(0, 8);
+    for(const c of ['91004C','91003C','89004C','89008C','90001C','92013C','34001C','01272C']){
+      if(top.length >= 8) break;
+      if(!top.includes(c) && codeByCode(c)) top.push(c);
+    }
+    el.innerHTML = top.length ? '<span class="freq-l">常用</span>' + top.map(c => {
+      const x = codeByCode(c);
+      return `<button type="button" class="chip fchip" data-code="${esc(c)}"><b class="mono">${esc(c.replace(/C$/, ''))}</b> ${esc(shortName(x.name))}</button>`;
+    }).join('') : '';
+  }
+  $('#freqChips').addEventListener('click', e => { const b = e.target.closest('.fchip'); if(b) chooseCode(b.dataset.code); });
+
+  /* ---- 平板：瀏覽代碼 ---- */
+  let pickCat = 'all', pickSub = 'all';
+  function renderPicker(){
+    if(!$('#pickList')) return;
+    const cats = [['all', '全部'], ...Object.entries(CATS).map(([k, v]) => [k, v.label])];
+    $('#pickCats').innerHTML = cats.map(([k, l]) => `<button type="button" class="chip ${k === pickCat ? 'active' : ''}" data-cat="${k}">${l}</button>`).join('');
+    $('#pickSubs').innerHTML = pickCat === 'other'
+      ? [['all', '全部'], ...Object.entries(SUBS)].map(([k, l]) => `<button type="button" class="chip ${k === pickSub ? 'active' : ''}" data-sub="${k}">${l}</button>`).join('') : '';
+    const q = selectedCode ? '' : insSearch.value.trim().toLowerCase();
+    let list = state.codes.filter(c => (pickCat === 'all' || c.cat === pickCat) && (pickCat !== 'other' || pickSub === 'all' || c.sub === pickSub) && matchCode(c, q));
+    list.sort((a, b) => a.code.localeCompare(b.code));
+    $('#pickList').innerHTML = list.length ? list.map(c => `
+      <button type="button" class="pick ${selectedCode && selectedCode.code === c.code ? 'selected' : ''}" data-code="${esc(c.code)}">
+        <span class="pc">${esc(c.code)}</span><span class="pn">${esc(c.name)}</span><span class="pp">${esc(c.points)}</span>
+      </button>`).join('') : '<div class="empty-state">沒有符合的代碼</div>';
+  }
+  $('#pickCats').addEventListener('click', e => { const b = e.target.closest('[data-cat]'); if(b){ pickCat = b.dataset.cat; pickSub = 'all'; renderPicker(); } });
+  $('#pickSubs').addEventListener('click', e => { const b = e.target.closest('[data-sub]'); if(b){ pickSub = b.dataset.sub; renderPicker(); } });
+  $('#pickList').addEventListener('click', e => { const b = e.target.closest('.pick'); if(b) chooseCode(b.dataset.code); });
+
+  /* ---- 預覽 ---- */
+  function updateInsPreview(){
+    const qty = parseFloat($('#insQty').value) || 0, pv = parseFloat($('#insPointValue').value) || 0, comm = parseFloat($('#insCommission').value) || 0;
+    $('#insPreview').textContent = fmt((selectedCode ? selectedCode.points : 0) * qty * pv * (comm / 100));
+  }
+  ['insQty','insPointValue','insCommission'].forEach(id => $('#' + id).addEventListener('input', updateInsPreview));
+  $$('.stepper button').forEach(b => b.addEventListener('click', () => {
+    const inp = $('#insQty'); inp.value = Math.max(1, (parseInt(inp.value, 10) || 1) + parseInt(b.dataset.step, 10)); updateInsPreview();
+  }));
+  function updateCashPreview(){
+    $('#cashPreview').textContent = fmt((parseFloat($('#cashAmount').value) || 0) * ((parseFloat($('#cashCommission').value) || 0) / 100));
+  }
+  ['cashAmount','cashCommission'].forEach(id => $('#' + id).addEventListener('input', updateCashPreview));
+
+  /* ---- 儲存 ---- */
+  function setEditing(on){ $('#editBanner').classList.toggle('hidden', !on); }
+  function resetInsForm(){
+    selectedCode = null; insSearch.value = ''; $('#insSelectedInfo').textContent = '';
+    $('#insQty').value = 1; $('#insNote').value = '';
+    $('#insSuggest').style.display = 'none';
+    applyClinicDefaults(); updateInsPreview();
+  }
+  function resetCashForm(){ $('#cashAmount').value = ''; $('#cashDesc').value = ''; updateCashPreview(); }
+  $('#cancelEdit').addEventListener('click', () => {
+    editingInsId = null; editingCashId = null; setEditing(false); resetInsForm(); resetCashForm(); setEntryType('insurance'); renderPicker();
+  });
+
+  $('#insSave').addEventListener('click', async () => {
+    if(!selectedCode){ toast('請先選擇申報代碼'); return; }
+    const clinic = clinicById($('#entryClinic').value);
+    if(!clinic){ toast('請先選擇診所'); return; }
+    const rec = touch({
+      id: editingInsId || uid(),
+      clinicId: clinic.id, clinicName: clinic.name,
+      date: $('#insDate').value || todayStr(),
+      code: selectedCode.code, name: selectedCode.name, cat: selectedCode.cat, sub: selectedCode.sub || '',
+      points: selectedCode.points, qty: Math.max(1, parseFloat($('#insQty').value) || 1),
+      pointValue: parseFloat($('#insPointValue').value) || 0, commission: parseFloat($('#insCommission').value) || 0,
+      note: $('#insNote').value.trim()
+    });
+    const editing = !!editingInsId;
+    if(editing){ const i = state.entries.findIndex(e => e.id === editingInsId); if(i > -1) state.entries[i] = rec; else state.entries.push(rec); }
+    else state.entries.push(rec);
+    persist();
+    editingInsId = null; setEditing(false);
+    resetInsForm();
+    toast(editing ? '已更新紀錄' : `已儲存 ${rec.code}（預估 ${fmt(incomeOfIns(rec))}）`);
+    if(isWide() && !editing){ renderFreq(); renderPicker(); renderRecent(); }
+    else goTo('dash');
+  });
+
+  $('#cashSave').addEventListener('click', async () => {
+    const clinic = clinicById($('#entryClinic').value);
+    if(!clinic){ toast('請先選擇診所'); return; }
+    const amt = parseFloat($('#cashAmount').value);
+    if(!amt || amt <= 0){ toast('請輸入自費金額'); return; }
+    const rec = touch({
+      id: editingCashId || uid(),
+      clinicId: clinic.id, clinicName: clinic.name,
+      date: $('#cashDate').value || todayStr(),
+      type: entryType, amount: amt, commission: parseFloat($('#cashCommission').value) || 0,
+      desc: $('#cashDesc').value.trim()
+    });
+    const editing = !!editingCashId;
+    if(editing){ const i = state.cash.findIndex(e => e.id === editingCashId); if(i > -1) state.cash[i] = rec; else state.cash.push(rec); }
+    else state.cash.push(rec);
+    persist();
+    editingCashId = null; setEditing(false);
+    resetCashForm();
+    toast(editing ? '已更新紀錄' : `已儲存自費紀錄（預估 ${fmt(incomeOfCash(rec))}）`);
+    if(isWide() && !editing) renderRecent(); else goTo('dash');
+  });
+
+  /* ---- 紀錄列（總覽與「最近紀錄」共用） ---- */
+  function entryRowHTML(e, showClinic){
+    const dot = showClinic ? `<span class="dot" style="background:${esc((clinicById(e.clinicId) || {}).color || '#999')};" title="${esc(e.clinicName)}"></span>` : '';
+    const acts = `<div class="entry-actions"><button type="button" class="icon-btn" data-act="edit" aria-label="編輯">✎</button><button type="button" class="icon-btn" data-act="del" aria-label="刪除">🗑</button></div>`;
+    if(e._kind === 'ins'){
+      const cat = CATS[e.cat] || CATS.other;
+      return `<div class="entry-row" data-kind="ins" data-id="${esc(e.id)}">
+        <div class="entry-main">
+          <div class="name">${dot}<span class="badge ${cat.cls}">${cat.label}</span> ${esc(e.code)} ${esc(e.name)}</div>
+          <div class="meta">${esc(e.date)} · ${esc(e.qty)}件 × ${esc(e.points)}點 × ${esc(e.pointValue)} · 抽成${esc(e.commission)}%${e.note ? ' · ' + esc(e.note) : ''}</div>
+        </div>
+        <div style="display:flex; align-items:center; gap:8px;"><div class="entry-amt">${fmt(incomeOfIns(e))}</div>${acts}</div>
+      </div>`;
+    }
+    return `<div class="entry-row" data-kind="cash" data-id="${esc(e.id)}">
+      <div class="entry-main">
+        <div class="name">${dot}<span class="badge other">${e.type === 'high' ? '高自費' : '一般自費'}</span> ${esc(e.desc) || '（未填說明）'}</div>
+        <div class="meta">${esc(e.date)} · 金額${Number(e.amount).toLocaleString()} · 抽成${esc(e.commission)}%</div>
+      </div>
+      <div style="display:flex; align-items:center; gap:8px;"><div class="entry-amt">${fmt(incomeOfCash(e))}</div>${acts}</div>
+    </div>`;
+  }
+  const sortRecent = (a, b) => b.date.localeCompare(a.date) || (b.updatedAt || 0) - (a.updatedAt || 0);
+
+  function renderRecent(){
+    const cid = $('#entryClinic').value;
+    const all = [
+      ...state.entries.filter(e => e.clinicId === cid).map(e => ({ ...e, _kind:'ins' })),
+      ...state.cash.filter(e => e.clinicId === cid).map(e => ({ ...e, _kind:'cash' }))
+    ].sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0)).slice(0, 8);
+    $('#recentList').innerHTML = all.length ? all.map(e => entryRowHTML(e, false)).join('') : '<div class="empty-state">還沒有紀錄</div>';
+  }
+
+  function handleEntryClick(ev){
+    const row = ev.target.closest('.entry-row');
+    const btn = ev.target.closest('button[data-act]');
+    if(!row || !btn) return;
+    const kind = row.dataset.kind, id = row.dataset.id, act = btn.dataset.act;
+    if(act === 'del'){
+      confirmAction('刪除這筆紀錄？', '刪除後無法復原。', () => {
+        if(kind === 'ins') state.entries = state.entries.filter(x => x.id !== id);
+        else state.cash = state.cash.filter(x => x.id !== id);
+        addTomb(id); persist(); renderDash(); renderRecent(); renderFreq(); toast('已刪除');
+      });
+    } else if(act === 'edit'){
+      if(kind === 'ins'){
+        const rec = state.entries.find(x => x.id === id); if(!rec) return;
+        goTo('add'); setEntryType('insurance');
+        editingInsId = id; editingCashId = null; setEditing(true);
+        $('#entryClinic').value = rec.clinicId;
+        $('#insDate').value = rec.date;
+        selectedCode = { code:rec.code, name:rec.name, points:rec.points, cat:rec.cat, sub:rec.sub || '' };
+        insSearch.value = rec.code + ' ' + rec.name; showSelectedInfo();
+        $('#insQty').value = rec.qty; $('#insPointValue').value = rec.pointValue; $('#insCommission').value = rec.commission;
+        $('#insNote').value = rec.note || '';
+        updateInsPreview(); renderPicker();
+      } else {
+        const rec = state.cash.find(x => x.id === id); if(!rec) return;
+        goTo('add'); setEntryType(rec.type);
+        editingCashId = id; editingInsId = null; setEditing(true);
+        $('#entryClinic').value = rec.clinicId;
+        $('#cashAmountLabel').textContent = rec.type === 'high' ? '高自費金額' : '一般自費金額';
+        $('#cashDate').value = rec.date; $('#cashAmount').value = rec.amount;
+        $('#cashCommission').value = rec.commission; $('#cashDesc').value = rec.desc || '';
+        updateCashPreview();
+      }
+    }
+  }
+  $('#entryList').addEventListener('click', handleEntryClick);
+  $('#recentList').addEventListener('click', handleEntryClick);
+
+  /* =====================================================================
+     總覽
+     ===================================================================== */
+  let currentRange = 'month', currentClinicFilter = 'all';
+
+  function renderClinicChips(){
+    const el = $('#clinicChips');
+    const chips = [{ id:'all', name:'全部診所', color:null }, ...state.clinics];
+    el.innerHTML = chips.map(c => `<button type="button" class="chip ${currentClinicFilter === c.id ? 'active' : ''}" data-clinic="${esc(c.id)}">${c.color ? `<span class="dot" style="background:${esc(c.color)};"></span>` : ''}${esc(c.name)}</button>`).join('');
+  }
+  $('#clinicChips').addEventListener('click', e => { const c = e.target.closest('[data-clinic]'); if(c){ currentClinicFilter = c.dataset.clinic; renderDash(); } });
+  $('#rangeChips').addEventListener('click', e => {
+    const c = e.target.closest('[data-range]'); if(!c) return;
+    $$('#rangeChips .chip').forEach(x => x.classList.toggle('active', x === c));
+    currentRange = c.dataset.range;
+    $('#customRange').style.display = currentRange === 'custom' ? 'flex' : 'none';
+    renderDash();
+  });
+  $('#rangeFrom').addEventListener('change', renderDash);
+  $('#rangeTo').addEventListener('change', renderDash);
+
+  function getRange(){
+    const n = new Date(), y = n.getFullYear(), m = n.getMonth();
+    let from, to;
+    if(currentRange === 'month'){ from = ymd(new Date(y, m, 1)); to = ymd(new Date(y, m + 1, 0)); }
+    else if(currentRange === 'lastmonth'){ from = ymd(new Date(y, m - 1, 1)); to = ymd(new Date(y, m, 0)); }
+    else if(currentRange === 'year'){ from = `${y}-01-01`; to = `${y}-12-31`; }
+    else { from = $('#rangeFrom').value || ymd(new Date(y, m, 1)); to = $('#rangeTo').value || todayStr(); if(from > to) [from, to] = [to, from]; }
+    return { from, to };
+  }
+  const inRange = (d, r) => d >= r.from && d <= r.to;   // 日期是 YYYY-MM-DD 字串，直接比較即可
+
+  function renderDash(){
+    renderClinicChips();
+    const r = getRange();
+    $('#rangeLabel').textContent = `${r.from} ～ ${r.to}`;
+    let ins = state.entries.filter(e => inRange(e.date, r)), cash = state.cash.filter(e => inRange(e.date, r));
+    if(currentClinicFilter !== 'all'){
+      ins = ins.filter(e => e.clinicId === currentClinicFilter); cash = cash.filter(e => e.clinicId === currentClinicFilter);
+    }
+    const active = currentClinicFilter !== 'all' ? clinicById(currentClinicFilter) : null;
+    $('#salaryTitle').textContent = active ? `${active.name}｜薪資結算` : '全部診所｜薪資結算';
+    $('#totalLabel').textContent = active ? `${active.name} 本期預估所得` : '本期預估總所得（全部診所）';
+
+    let insIncome = 0, totalPoints = 0;
+    const catPts = {}, catInc = {};
+    Object.keys(CATS).forEach(k => { catPts[k] = 0; catInc[k] = 0; });
+    ins.forEach(e => {
+      const pts = e.points * e.qty, inc = incomeOfIns(e), k = CATS[e.cat] ? e.cat : 'other';
+      insIncome += inc; totalPoints += pts; catPts[k] += pts; catInc[k] += inc;
+    });
+    let general = 0, high = 0;
+    cash.forEach(e => { const inc = incomeOfCash(e); if(e.type === 'high') high += inc; else general += inc; });
+
+    $('#sumInsurance').textContent = fmt(insIncome);
+    $('#sumGeneral').textContent = fmt(general);
+    $('#sumHigh').textContent = fmt(high);
+    $('#sumTotal').textContent = fmt(insIncome + general + high);
+    $('#pointsHint').textContent = `本期健保申報總點值：${totalPoints.toLocaleString()} 點，共 ${ins.length} 筆申報`;
+
+    const bk = $('#clinicBreakdownCard');
+    if(currentClinicFilter === 'all' && state.clinics.length > 1){
+      bk.style.display = '';
+      $('#clinicBreakdownBody').innerHTML = state.clinics.map(c => {
+        const a = state.entries.filter(e => inRange(e.date, r) && e.clinicId === c.id).reduce((s, e) => s + incomeOfIns(e), 0);
+        const b = state.cash.filter(e => inRange(e.date, r) && e.clinicId === c.id).reduce((s, e) => s + incomeOfCash(e), 0);
+        return `<tr><td><span class="clinic-tag"><span class="dot" style="background:${esc(c.color)};"></span>${esc(c.name)}</span></td>
+          <td class="num">${fmt(a)}</td><td class="num">${fmt(b)}</td><td class="num"><b>${fmt(a + b)}</b></td></tr>`;
+      }).join('');
+    } else bk.style.display = 'none';
+
+    const maxPts = Math.max(1, ...Object.values(catPts));
+    $('#catBreakdown').innerHTML = Object.keys(CATS).map(k => `<div style="margin-bottom:10px;">
+        <div class="flex-between" style="margin-bottom:4px;">
+          <span class="badge ${CATS[k].cls}">${CATS[k].label}</span>
+          <span class="mono hint">${catPts[k].toLocaleString()} 點 · ${fmt(catInc[k])}</span>
+        </div>
+        <div style="height:7px; background:var(--gray-soft); border-radius:6px; overflow:hidden;">
+          <div style="height:100%; width:${catPts[k] ? Math.round(catPts[k] / maxPts * 100) : 0}%; background:var(--${CAT_COLOR[k]});"></div>
+        </div></div>`).join('');
+
+    const all = [...ins.map(e => ({ ...e, _kind:'ins' })), ...cash.map(e => ({ ...e, _kind:'cash' }))].sort(sortRecent);
+    $('#entryCount').textContent = `共 ${all.length} 筆`;
+    const showClinic = currentClinicFilter === 'all' && state.clinics.length > 1;
+    $('#entryList').innerHTML = all.length ? all.map(e => entryRowHTML(e, showClinic)).join('')
+      : `<div class="empty-state">${state.clinics.length ? '這段期間還沒有紀錄，到「新增紀錄」開始記帳。' : '先到「診所」頁新增你服務的診所，再開始記帳。'}</div>`;
+  }
+
+  /* =====================================================================
+     代碼庫
+     ===================================================================== */
+  let codeFilter = 'all', codeSubFilter = 'all';
+  function renderCodes(){
+    const cats = [['all', '全部'], ...Object.entries(CATS).map(([k, v]) => [k, v.label])];
+    $('#codeCatChips').innerHTML = cats.map(([k, l]) => `<button type="button" class="chip ${k === codeFilter ? 'active' : ''}" data-cat="${k}">${l}</button>`).join('');
+    $('#codeSubChips').innerHTML = codeFilter === 'other'
+      ? [['all', '全部'], ...Object.entries(SUBS)].map(([k, l]) => `<button type="button" class="chip ${k === codeSubFilter ? 'active' : ''}" data-sub="${k}">${l}</button>`).join('') : '';
+    const q = $('#codeSearch').value.trim().toLowerCase();
+    let list = state.codes.filter(c => (codeFilter === 'all' || c.cat === codeFilter) && (codeFilter !== 'other' || codeSubFilter === 'all' || c.sub === codeSubFilter) && matchCode(c, q));
+    list.sort((a, b) => a.code.localeCompare(b.code));
+    $('#codeVerNote').textContent = `代碼表版本：${CODES_VERSION_LABEL}・目前共 ${state.codes.length} 項` + (list.length !== state.codes.length ? `（顯示 ${list.length} 項）` : '');
+    $('#codeList').innerHTML = list.length ? list.map(c => {
+      const cat = CATS[c.cat] || CATS.other;
+      return `<div class="code-row" data-code="${esc(c.code)}">
+        <span class="code">${esc(c.code)}</span>
+        <span class="cname">${esc(c.name)}${c.sub ? `<span class="sub-tag">${esc(SUBS[c.sub] || c.sub)}</span>` : ''}</span>
+        <span class="cpts mono">${esc(c.points)}</span>
+        <span class="badge ${cat.cls}">${cat.label}</span>
+        <button type="button" class="icon-btn" data-act="edit" aria-label="編輯代碼">✎</button>
+        <button type="button" class="icon-btn" data-act="del" aria-label="刪除代碼">🗑</button>
+      </div>`;
+    }).join('') : '<div class="empty-state">沒有符合的代碼</div>';
+  }
+  $('#codeSearch').addEventListener('input', renderCodes);
+  $('#codeCatChips').addEventListener('click', e => { const b = e.target.closest('[data-cat]'); if(b){ codeFilter = b.dataset.cat; codeSubFilter = 'all'; renderCodes(); } });
+  $('#codeSubChips').addEventListener('click', e => { const b = e.target.closest('[data-sub]'); if(b){ codeSubFilter = b.dataset.sub; renderCodes(); } });
+
+  $('#cmSub').innerHTML = '<option value="">（未分類）</option>' + Object.entries(SUBS).map(([k, l]) => `<option value="${k}">${l}</option>`).join('');
+  let editingCode = null;
+  const syncSubField = () => $('#cmSubField').style.display = $('#cmCategory').value === 'other' ? '' : 'none';
+  $('#cmCategory').addEventListener('change', syncSubField);
+  function openCodeModal(existing){
+    editingCode = existing ? existing.code : null;
+    $('#codeModalTitle').textContent = existing ? '編輯代碼' : '新增代碼';
+    $('#cmCode').value = existing ? existing.code : ''; $('#cmCode').disabled = !!existing;
+    $('#cmName').value = existing ? existing.name : '';
+    $('#cmPoints').value = existing ? existing.points : '';
+    $('#cmCategory').value = existing ? existing.cat : 'other';
+    $('#cmSub').value = existing ? (existing.sub || '') : '';
+    syncSubField();
+    $('#codeModalBg').classList.add('show');
+  }
+  $('#openAddCode').addEventListener('click', () => openCodeModal(null));
+  $('#cmCancel').addEventListener('click', () => $('#codeModalBg').classList.remove('show'));
+  $('#cmSave').addEventListener('click', () => {
+    const code = $('#cmCode').value.trim().toUpperCase(), name = $('#cmName').value.trim();
+    const points = parseFloat($('#cmPoints').value), cat = $('#cmCategory').value;
+    const sub = cat === 'other' ? $('#cmSub').value : '';
+    if(!code || !name || isNaN(points)){ toast('請完整填寫代碼、名稱與點數'); return; }
+    const cur = codeByCode(code);
+    if(editingCode){ Object.assign(cur, { name, points, cat, sub }); touch(cur); }
+    else {
+      if(cur){ toast('這個代碼已存在，請改用 ✎ 編輯'); return; }
+      state.codes.push(touch({ id:code, code, name, points, cat, sub }));
+      state.tomb = state.tomb.filter(t => t.id !== code);
+    }
+    persist();
+    $('#codeModalBg').classList.remove('show');
+    renderCodes(); renderFreq(); renderPicker();
+    toast('已儲存代碼（新點數只套用在之後新增的紀錄）');
+  });
+  $('#codeList').addEventListener('click', e => {
+    const row = e.target.closest('.code-row'), btn = e.target.closest('button[data-act]');
+    if(!row || !btn) return;
+    const rec = codeByCode(row.dataset.code); if(!rec) return;
+    if(btn.dataset.act === 'edit') openCodeModal(rec);
+    else confirmAction('刪除這個代碼？', `代碼 ${rec.code}「${rec.name}」將從代碼庫移除（不影響已存的紀錄）。`, () => {
+      state.codes = state.codes.filter(c => c.code !== rec.code);
+      addTomb(rec.code.toUpperCase()); persist();
+      renderCodes(); renderFreq(); renderPicker(); toast('已刪除代碼');
+    });
+  });
+
+  /* =====================================================================
+     診所
+     ===================================================================== */
+  function renderClinics(){
+    const el = $('#clinicList');
+    if(!state.clinics.length){ el.innerHTML = '<div class="empty-state">還沒有新增診所，點右上角「＋ 新增診所」開始。</div>'; return; }
+    el.innerHTML = state.clinics.map(c => `
+      <div class="clinic-card" data-id="${esc(c.id)}">
+        <div class="head">
+          <div class="name"><span class="dot" style="background:${esc(c.color)}; width:12px; height:12px;"></span>${esc(c.name)}</div>
+          <div class="entry-actions">
+            <button type="button" class="icon-btn" data-act="edit" aria-label="編輯診所">✎</button>
+            <button type="button" class="icon-btn" data-act="del" aria-label="刪除診所">🗑</button>
+          </div>
+        </div>
+        <div class="rates">
+          <div>健保抽成：<b>${esc(c.insCommission)}%</b></div>
+          <div>健保點值：<b>${esc(c.pointValue)}</b></div>
+          <div>一般自費抽成：<b>${esc(c.generalCommission)}%</b></div>
+          <div>高自費抽成：<b>${esc(c.highCommission)}%</b></div>
+        </div>
+      </div>`).join('');
+  }
+  let editingClinicId = null;
+  function renderSwatches(selected){
+    $('#clSwatches').innerHTML = CLINIC_COLORS.map(col => `<span class="swatch ${col === selected ? 'active' : ''}" data-color="${col}" style="background:${col};"></span>`).join('');
+  }
+  $('#clSwatches').addEventListener('click', e => {
+    const sw = e.target.closest('.swatch'); if(!sw) return;
+    $('#clColor').value = sw.dataset.color; renderSwatches(sw.dataset.color);
+  });
+  function openClinicModal(existing){
+    editingClinicId = existing ? existing.id : null;
+    $('#clinicModalTitle').textContent = existing ? '編輯診所' : '新增診所';
+    $('#clName').value = existing ? existing.name : '';
+    const color = existing ? existing.color : CLINIC_COLORS[state.clinics.length % CLINIC_COLORS.length];
+    $('#clColor').value = color; renderSwatches(color);
+    $('#clInsCommission').value = existing ? existing.insCommission : 50;
+    $('#clPointValue').value = existing ? existing.pointValue : 0.8;
+    $('#clGeneralCommission').value = existing ? existing.generalCommission : 30;
+    $('#clHighCommission').value = existing ? existing.highCommission : 15;
+    $('#clinicModalBg').classList.add('show');
+  }
+  $('#openAddClinic').addEventListener('click', () => openClinicModal(null));
+  $('#clCancel').addEventListener('click', () => $('#clinicModalBg').classList.remove('show'));
+  $('#clSave').addEventListener('click', () => {
+    const name = $('#clName').value.trim();
+    if(!name){ toast('請輸入診所名稱'); return; }
+    const num = id => { const v = parseFloat($(id).value); return isNaN(v) ? 0 : v; };
+    const rec = touch({
+      id: editingClinicId || uid(), name, color: $('#clColor').value || CLINIC_COLORS[0],
+      insCommission: num('#clInsCommission'), pointValue: num('#clPointValue'),
+      generalCommission: num('#clGeneralCommission'), highCommission: num('#clHighCommission')
+    });
+    if(editingClinicId){
+      const i = state.clinics.findIndex(c => c.id === editingClinicId);
+      if(i > -1) state.clinics[i] = rec;
+      [...state.entries, ...state.cash].forEach(e => { if(e.clinicId === rec.id && e.clinicName !== rec.name){ e.clinicName = rec.name; touch(e); } });
+    } else state.clinics.push(rec);
+    persist();
+    $('#clinicModalBg').classList.remove('show');
+    renderClinics(); refreshClinicOptions(); renderDash();
+    toast('已儲存診所');
+  });
+  $('#clinicList').addEventListener('click', e => {
+    const card = e.target.closest('.clinic-card'), btn = e.target.closest('button[data-act]');
+    if(!card || !btn) return;
+    const rec = clinicById(card.dataset.id); if(!rec) return;
+    if(btn.dataset.act === 'edit') openClinicModal(rec);
+    else confirmAction('刪除這間診所？', `「${rec.name}」將從清單移除，之後無法用來新增紀錄；過去已存的紀錄仍會保留，只在「全部診所」檢視中顯示。`, () => {
+      state.clinics = state.clinics.filter(c => c.id !== rec.id);
+      addTomb(rec.id); persist(); renderClinics(); refreshClinicOptions(); renderDash(); toast('已刪除診所');
+    });
+  });
+
+  /* =====================================================================
+     備份
+     ===================================================================== */
+  $('#exportData').addEventListener('click', () => {
+    const blob = new Blob([JSON.stringify({ v:1, exportedAt:new Date().toISOString(), ...state }, null, 1)], { type:'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'dental_ledger_backup_' + todayStr() + '.json';
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+  });
+  $('#importData').addEventListener('click', () => $('#importFile').click());
+  $('#importFile').addEventListener('change', async e => {
+    const file = e.target.files[0]; if(!file) return;
+    try{
+      const data = JSON.parse(await file.text());
+      applyMerged(mergeStates(state, { codes:data.codes || [], clinics:data.clinics || [], entries:data.entries || [], cash:data.cash || [], tomb:data.tomb || [] }));
+      persist(); renderAll(); toast('備份已合併匯入');
+    }catch(err){ toast('匯入失敗，請確認檔案格式'); }
+    e.target.value = '';
+  });
+
+  /* =====================================================================
+     確認視窗
+     ===================================================================== */
+  let confirmCb = null;
+  function confirmAction(title, body, cb, okLabel){
+    $('#confirmTitle').textContent = title; $('#confirmBody').textContent = body;
+    $('#confirmOk').textContent = okLabel || '刪除';
+    confirmCb = cb; $('#confirmModalBg').classList.add('show');
+  }
+  $('#confirmCancel').addEventListener('click', () => { $('#confirmModalBg').classList.remove('show'); confirmCb = null; });
+  $('#confirmOk').addEventListener('click', () => {
+    $('#confirmModalBg').classList.remove('show');
+    const cb = confirmCb; confirmCb = null; if(cb) cb();
+  });
+  $$('.modal-bg').forEach(bg => bg.addEventListener('click', e => { if(e.target === bg) bg.classList.remove('show'); }));
+
+  /* =====================================================================
+     啟動
+     ===================================================================== */
+  (async function init(){
+    loadCloud();
+    consumeSyncHash();
+    state.codes = lsGet('codes', []); state.clinics = lsGet('clinics', []);
+    state.entries = lsGet('entries', []); state.cash = lsGet('cash', []); state.tomb = lsGet('tomb', []);
+    normalizeState();
+    let msg = '';
+    if(lsGet('codeVer', null) !== CODES_VERSION || !state.codes.length){
+      const r = applyDefaultCodes();
+      lsSet('codeVer', CODES_VERSION);
+      if(r.added || r.updated) msg = `代碼庫已更新為${CODES_VERSION_LABEL}：新增 ${r.added} 項、更新 ${r.updated} 項`;
+    }
+    persistLocal();
+    try{ if(navigator.storage && navigator.storage.persist) navigator.storage.persist(); }catch(e){}
+    refreshClinicOptions();
+    renderAll();
+    setBadge(cloudOn() ? 'ok' : 'off');
+    if(msg) toast(msg);
+    if(cloudOn()) syncNow();
+  })();
+
+})();
+
+</script>
+</body>
+</html>
