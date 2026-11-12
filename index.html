@@ -397,6 +397,44 @@
   .qgrid{max-height:340px;}
 }
 
+/* ================= v3.2 緊湊版：輸入優先、單頁不捲動 ================= */
+.toprow{display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:8px; margin-bottom:8px;}
+.toprow select,.toprow input{min-height:42px; padding:6px 10px;}
+.toprow input[type=date]{min-width:0;}
+.seg button{min-height:40px; padding:7px 4px;}
+.coderow{display:flex; gap:8px; align-items:stretch;}
+.coderow .code-display{flex:1; min-width:0; min-height:52px !important; font-size:21px !important;}
+.note-btn{flex-shrink:0; border:1px solid var(--line); background:#fff; border-radius:10px; padding:0 12px; font-size:13px; font-weight:700; color:var(--ink-soft); cursor:pointer;}
+#noteWrap{margin-top:6px;}
+#noteWrap input{min-height:40px;}
+.slot{height:42px; display:flex; align-items:center; margin-top:4px; overflow:hidden;}
+.slot .suggest{position:static; display:none; flex-direction:row; gap:6px; width:100%; max-height:none; overflow-x:auto; overflow-y:hidden; border:0; box-shadow:none; background:none; margin:0; scrollbar-width:none;}
+.slot .suggest::-webkit-scrollbar{display:none;}
+.slot .suggest .opt{flex-shrink:0; white-space:nowrap; border:1px solid var(--line); border-radius:18px; padding:7px 12px; border-bottom:1px solid var(--line); background:#fff; font-size:13px;}
+.slot .suggest .opt:last-child{border-bottom:1px solid var(--line);}
+.slot .suggest .empty{white-space:nowrap;}
+.sel-info{margin-top:0; min-height:0;}
+.qtyrow{margin-bottom:8px;}
+.qtyrow .stepper input,.qtyrow .stepper button{min-height:44px;}
+.keypad{gap:6px; margin-bottom:8px;}
+.keypad button{min-height:clamp(42px,5.8dvh,60px);}
+.qcats{margin-bottom:6px;}
+.qcats .chip{min-height:34px; padding:6px 13px;}
+
+@media (max-width:767.98px){
+  #view-add.active{display:flex; flex-direction:column; height:calc(100vh - 128px); height:calc(100dvh - 128px - env(safe-area-inset-bottom)); min-height:520px;}
+  body:has(#view-add.active){padding-bottom:0;}
+  body:has(#view-add.active) main{padding-bottom:10px;}
+  .add-main{flex:1; min-height:0; display:flex; flex-direction:column;}
+  #addFormCard{flex:1; min-height:0; display:flex; flex-direction:column; padding:10px;}
+  #form-insurance{flex:1; min-height:0; display:flex; flex-direction:column;}
+  .qgrid{flex:1; min-height:70px; max-height:none; margin-bottom:0;}
+  .qbtn{min-height:56px;}
+  main{padding-top:10px;}
+}
+#form-insurance > *{flex-shrink:0;}
+#form-insurance > .qgrid{flex-shrink:1;}
+
 </style>
 </head>
 <body>
@@ -501,9 +539,10 @@
     <div class="add-main">
       <div class="card" id="addFormCard">
         <div id="editBanner" class="edit-banner hidden"><span>正在編輯既有紀錄</span><button type="button" class="btn btn-ghost btn-sm" id="cancelEdit">取消編輯</button></div>
-        <div class="field">
-          <label for="entryClinic">診所</label>
-          <select id="entryClinic"></select>
+        <div class="toprow">
+          <select id="entryClinic" aria-label="診所"></select>
+          <input type="date" id="insDate" aria-label="日期">
+          <input type="date" id="cashDate" aria-label="日期" style="display:none;">
         </div>
         <div class="seg" id="entryTypeSeg">
           <button type="button" data-type="insurance" class="active">健保申報</button>
@@ -512,21 +551,19 @@
         </div>
 
         <div id="form-insurance">
-          <div class="field">
-            <label for="insDate">日期</label>
-            <input type="date" id="insDate">
-          </div>
           <input type="hidden" id="insPointValue"><input type="hidden" id="insCommission">
 
           <div class="codebox">
-            <input type="text" id="insCodeSearch" class="code-display" inputmode="none" placeholder="用下方按鈕輸入代碼" autocomplete="off" autocapitalize="characters" spellcheck="false" aria-label="申報代碼">
-            <div class="suggest" id="insSuggest" style="display:none;"></div>
-            <div id="insSelectedInfo" class="sel-info"></div>
+            <div class="coderow">
+              <input type="text" id="insCodeSearch" class="code-display" inputmode="none" placeholder="用按鈕輸入代碼" autocomplete="off" autocapitalize="characters" spellcheck="false" aria-label="申報代碼">
+              <button type="button" id="noteBtn" class="note-btn" aria-label="備註">備註</button>
+            </div>
+            <div class="hidden" id="noteWrap"><input type="text" id="insNote" placeholder="病人代號、備註…" aria-label="備註"></div>
+            <div class="slot">
+              <div class="suggest" id="insSuggest" style="display:none;"></div>
+              <div id="insSelectedInfo" class="sel-info"></div>
+            </div>
           </div>
-
-          <div class="chips qcats" id="qCats"></div>
-          <div class="chips qsubs" id="qSubs"></div>
-          <div class="qgrid" id="qGrid"></div>
 
           <div class="qtyrow">
             <div class="stepper"><button type="button" data-step="-1" aria-label="減少">−</button><input type="number" id="insQty" value="1" min="1" step="1" inputmode="numeric" aria-label="數量"><button type="button" data-step="1" aria-label="增加">＋</button></div>
@@ -540,14 +577,12 @@
             <button type="button" data-k="clr" class="k-fn">清除</button><button type="button" data-k="0">0</button><button type="button" data-k="txt" id="keyTxt" class="k-fn">名稱</button><button type="button" id="insSave" class="k-save">儲存</button>
           </div>
 
-          <details class="help"><summary>備註（選填）</summary><input type="text" id="insNote" placeholder="病人代號、備註…"></details>
+          <div class="chips qcats" id="qCats"></div>
+          <div class="chips qsubs" id="qSubs"></div>
+          <div class="qgrid" id="qGrid"></div>
         </div>
 
         <div id="form-cash" style="display:none;">
-          <div class="field">
-            <label for="cashDate">日期</label>
-            <input type="date" id="cashDate">
-          </div>
           <div class="field">
             <label id="cashAmountLabel" for="cashAmount">自費金額</label>
             <input type="number" id="cashAmount" placeholder="0" step="1" inputmode="numeric">
@@ -1286,6 +1321,8 @@
     entryType = type;
     $$('#entryTypeSeg button').forEach(b => b.classList.toggle('active', b.dataset.type === type));
     $('#form-insurance').style.display = type === 'insurance' ? '' : 'none';
+    $('#insDate').style.display = type === 'insurance' ? '' : 'none';
+    $('#cashDate').style.display = type === 'insurance' ? 'none' : '';
     $('#form-cash').style.display = type === 'insurance' ? 'none' : '';
     applyClinicDefaults();
   }
@@ -1375,12 +1412,14 @@
     box.innerHTML = list.length
       ? list.map(c => `<div class="opt" data-code="${esc(c.code)}"><span class="code">${esc(c.code)}</span>${esc(c.name)} <span class="hint">· ${esc(c.points)}點</span></div>`).join('')
       : '<div class="empty">找不到符合的代碼，可到「代碼庫」新增</div>';
-    box.style.display = 'block';
+    box.style.display = 'flex';
   });
   $('#insSuggest').addEventListener('click', e => {
     const opt = e.target.closest('.opt');
     if(opt && opt.dataset.code) chooseCode(opt.dataset.code);
   });
+
+  $('#noteBtn').addEventListener('click', () => { const w = $('#noteWrap'); w.classList.toggle('hidden'); if(!w.classList.contains('hidden')) $('#insNote').focus(); });
 
   /* 數字鍵盤 */
   let textMode = false;
@@ -1448,7 +1487,7 @@
   function setEditing(on){ $('#editBanner').classList.toggle('hidden', !on); }
   function resetInsForm(){
     selectedCode = null; insSearch.value = ''; $('#insSelectedInfo').textContent = '';
-    $('#insQty').value = 1; $('#insNote').value = '';
+    $('#insQty').value = 1; $('#insNote').value = ''; $('#noteWrap').classList.add('hidden');
     $('#insSuggest').style.display = 'none';
     applyClinicDefaults(); updateInsPreview(); renderQuick();
   }
@@ -1556,7 +1595,7 @@
         selectedCode = { code:rec.code, name:rec.name, points:rec.points, cat:rec.cat, sub:rec.sub || '' };
         insSearch.value = rec.code + ' ' + rec.name; showSelectedInfo();
         $('#insQty').value = rec.qty; $('#insPointValue').value = rec.pointValue; $('#insCommission').value = rec.commission;
-        $('#insNote').value = rec.note || '';
+        $('#insNote').value = rec.note || ''; $('#noteWrap').classList.toggle('hidden', !rec.note);
         updateInsPreview(); renderQuick();
       } else {
         const rec = state.cash.find(x => x.id === id); if(!rec) return;
