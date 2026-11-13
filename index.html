@@ -552,7 +552,7 @@
         </div>
 
         <div class="card span2" id="goalCard" style="display:none;">
-          <h2>今日目標</h2>
+          <h2>目標進度</h2>
           <div id="goalBody"></div>
         </div>
 
@@ -823,6 +823,10 @@
     <div class="row">
       <div class="field"><label for="clGn">晚診目標</label><input type="number" id="clGn" inputmode="numeric" min="0" step="100"></div>
       <div class="field"><label for="clGd">當天目標（全天）</label><input type="number" id="clGd" inputmode="numeric" min="0" step="100"></div>
+    </div>
+    <div class="row">
+      <div class="field"><label for="clGo">當月目標</label><input type="number" id="clGo" inputmode="numeric" min="0" step="1000" placeholder="例如 100000"></div>
+      <div class="field"></div>
     </div>
     <div class="hint" style="margin-top:6px;">留空代表這間診所沒有這一診；診次之間的空檔會歸到最近的一診。</div>
     <div class="actions">
@@ -1477,51 +1481,57 @@
   document.addEventListener('visibilitychange', () => { if(document.visibilityState === 'visible') autoShift(); });
 
   /* ---- 自我目標（診次／當天） ---- */
-  const GOAL_KEYS = ['m','a','n','d'];
-  const goalLabel = k => k === 'd' ? '當天' : SHIFTS[k];
+  const GOAL_KEYS = ['m','a','n','d','mo'];
+  const goalLabel = k => k === 'd' ? '當天' : k === 'mo' ? '本月' : SHIFTS[k];
   const goalOf = (c, k) => (c && c.goals && Number(c.goals[k]) > 0) ? Number(c.goals[k]) : 0;
   const hasGoals = c => GOAL_KEYS.some(k => goalOf(c, k) > 0);
   function progressFor(clinicId, date){
-    const p = { m:0, a:0, n:0, d:0 };
-    for(const e of state.entries){ if(e.clinicId === clinicId && e.date === date){ const v = incomeOfIns(e); p.d += v; if(p[e.shift] !== undefined) p[e.shift] += v; } }
-    for(const e of state.cash){ if(e.clinicId === clinicId && e.date === date){ const v = incomeOfCash(e); p.d += v; if(p[e.shift] !== undefined) p[e.shift] += v; } }
+    const p = { m:0, a:0, n:0, d:0, mo:0 }, ym = date.slice(0, 7);
+    const add = (e, v) => {
+      if(e.clinicId !== clinicId) return;
+      if(e.date.slice(0, 7) === ym) p.mo += v;
+      if(e.date === date){ p.d += v; if(p[e.shift] !== undefined && e.shift !== 'd' && e.shift !== 'mo') p[e.shift] += v; }
+    };
+    state.entries.forEach(e => add(e, incomeOfIns(e)));
+    state.cash.forEach(e => add(e, incomeOfCash(e)));
     return p;
   }
   function goalMark(){ return lsGet('goalHit', {}); }
-  function goalMarkSet(key){ const t = todayStr(), m = goalMark(), n = {}; for(const k in m){ if(k.startsWith(t)) n[k] = 1; } n[key] = 1; lsSet('goalHit', n); }
+  function goalMarkSet(key){ const t = todayStr().slice(0, 7), m = goalMark(), n = {}; for(const k in m){ if(k.startsWith(t)) n[k] = 1; } n[key] = 1; lsSet('goalHit', n); }
   function renderGoalStrip(){
     const el = $('#goalStrip'), c = clinicById($('#entryClinic').value);
-    const gs = curShift ? goalOf(c, curShift) : 0, gd = goalOf(c, 'd');
-    if(!c || (!gs && !gd)){ el.classList.add('hidden'); return; }
+    const gs = curShift ? goalOf(c, curShift) : 0, gd = goalOf(c, 'd'), go = goalOf(c, 'mo');
+    if(!c || (!gs && !gd && !go)){ el.classList.add('hidden'); return; }
     const p = progressFor(c.id, todayStr());
     el.classList.remove('hidden');
-    const main = gs ? { v:p[curShift], g:gs, l:SHIFTS[curShift] } : { v:p.d, g:gd, l:'當天' };
+    const main = gs ? { v:p[curShift], g:gs, l:SHIFTS[curShift] } : gd ? { v:p.d, g:gd, l:'當天' } : { v:p.mo, g:go, l:'本月' };
     const pct = Math.min(100, Math.round(main.v / main.g * 100));
     el.classList.toggle('hit', main.v >= main.g);
     $('#goalFill').style.width = pct + '%';
     $('#goalText').textContent = main.v >= main.g ? `${main.l}達標 ✓ ${fmt(main.v)}` : `${main.l} ${fmt(main.v)}／${fmt(main.g)}`;
-    $('#goalDay').textContent = gs && gd ? `今日 ${fmt(p.d)}／${fmt(gd)}` : '';
+    $('#goalDay').textContent = [gs && gd ? `今日 ${fmt(p.d)}／${fmt(gd)}` : '', go && main.l !== '本月' ? `本月 ${Math.round(p.mo / go * 100)}%` : ''].filter(Boolean).join('・');
   }
   const PRAISE = ['這一診做得很漂亮。','穩穩的，繼續保持。','給自己一點掌聲吧。','今天的節奏很棒。','辛苦了，這是你應得的。'];
   function goalFeedback(clinic, date, before, after){
     const out = { hits:[], nudge:'' };
-    if(date !== todayStr() || !hasGoals(clinic)) return out;
-    const marks = goalMark();
+    if(!hasGoals(clinic)) return out;
+    const today = todayStr(), marks = goalMark();
     for(const k of GOAL_KEYS){
       const g = goalOf(clinic, k); if(!g) continue;
-      const key = `${date}|${clinic.id}|${k}`;
+      if(k === 'mo' ? date.slice(0, 7) !== today.slice(0, 7) : date !== today) continue;
+      const key = `${k === 'mo' ? date.slice(0, 7) : date}|${clinic.id}|${k}`;
       if(before[k] < g && after[k] >= g && !marks[key]){ out.hits.push({ k, g, v:after[k] }); goalMarkSet(key); }
       else if(before[k] < g * 0.8 && after[k] >= g * 0.8 && after[k] < g && !marks[key + '|n']){
         goalMarkSet(key + '|n');
-        out.nudge = `${goalLabel(k)}再 ${fmt(g - after[k])} 就達標！`;
+        out.nudge = out.nudge || `${goalLabel(k)}再 ${fmt(g - after[k])} 就達標！`;
       }
     }
     return out;
   }
   function showGoalHit(clinic, hits){
     const names = hits.map(h => goalLabel(h.k) + '目標');
-    $('#goalEmoji').textContent = hits.length > 1 || hits.some(h => h.k === 'd') ? '🏆' : '🎉';
-    $('#goalTitle').textContent = hits.length > 1 ? '雙喜臨門！' : (hits[0].k === 'd' ? '今天目標達成！' : SHIFTS[hits[0].k] + '達標！');
+    $('#goalEmoji').textContent = hits.length > 1 || hits.some(h => h.k === 'd' || h.k === 'mo') ? '🏆' : '🎉';
+    $('#goalTitle').textContent = hits.length > 1 ? '雙喜臨門！' : (hits[0].k === 'd' ? '今天目標達成！' : hits[0].k === 'mo' ? '本月目標達成！' : SHIFTS[hits[0].k] + '達標！');
     $('#goalMsg').innerHTML = hits.map(h => `<div><b>${esc(goalLabel(h.k))}</b>　${fmt(h.v)}／${fmt(h.g)}（+${fmt(h.v - h.g)}）</div>`).join('') + `<div class="goal-praise">${esc(clinic.name)}・${PRAISE[Math.floor(Math.random() * PRAISE.length)]}</div>`;
     $('#goalModalBg').classList.add('show');
     confetti();
@@ -1555,7 +1565,12 @@
       const p = progressFor(c.id, t);
       const rows = GOAL_KEYS.filter(k => goalOf(c, k)).map(k => {
         const g = goalOf(c, k), v = p[k], pct = Math.min(100, Math.round(v / g * 100)), hit = v >= g;
-        return `<div class="goal-row ${hit ? 'hit' : ''}"><div class="flex-between"><span class="gname">${esc(goalLabel(k))}${hit ? ' ✓' : ''}</span><span class="mono">${fmt(v)} <span class="hint">／ ${fmt(g)}</span></span></div><div class="shbar"><div style="width:${pct}%; background:${hit ? 'var(--money,#2e7d5b)' : 'var(--teal)'};"></div></div></div>`;
+        let extra = '';
+        if(k === 'mo'){
+          const now = new Date(), left = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate() - now.getDate() + 1;
+          extra = hit ? `<div class="hint">已超過目標 ${fmt(v - g)}，辛苦了！</div>` : `<div class="hint">還差 ${fmt(g - v)}・剩 ${left} 天（含今天）・平均每天 ${fmt((g - v) / left)}</div>`;
+        }
+        return `<div class="goal-row ${hit ? 'hit' : ''}"><div class="flex-between"><span class="gname">${esc(goalLabel(k))}${hit ? ' ✓' : ''}</span><span class="mono">${fmt(v)} <span class="hint">／ ${fmt(g)}</span></span></div><div class="shbar"><div style="width:${pct}%; background:${hit ? 'var(--money,#2e7d5b)' : 'var(--teal)'};"></div></div>${extra}</div>`;
       }).join('');
       return `<div class="goal-clinic">${cl.length > 1 ? `<div class="hint" style="margin-bottom:6px;"><span class="dot" style="background:${esc(c.color)};"></span> ${esc(c.name)}</div>` : ''}${rows}</div>`;
     }).join('');
@@ -2138,7 +2153,7 @@
     $('#clGeneralCommission').value = existing ? existing.generalCommission : 30;
     $('#clHighCommission').value = existing ? existing.highCommission : 15;
     const sh = getShifts(existing);
-    [['m','Gm'],['a','Ga'],['n','Gn'],['d','Gd']].forEach(([k, id]) => { $('#cl' + id).value = goalOf(existing, k) || ''; });
+    [['m','Gm'],['a','Ga'],['n','Gn'],['d','Gd'],['mo','Go']].forEach(([k, id]) => { $('#cl' + id).value = goalOf(existing, k) || ''; });
     [['m','M'],['a','A'],['n','N']].forEach(([k, K]) => { $('#cl' + K + 's').value = (sh[k] && sh[k][0]) || ''; $('#cl' + K + 'e').value = (sh[k] && sh[k][1]) || ''; });
     $('#clinicModalBg').classList.add('show');
   }
@@ -2152,7 +2167,7 @@
       id: editingClinicId || uid(), name, color: $('#clColor').value || CLINIC_COLORS[0],
       insCommission: num('#clInsCommission'), pointValue: num('#clPointValue'),
       generalCommission: num('#clGeneralCommission'), highCommission: num('#clHighCommission'),
-      goals: (() => { const o = {}; [['m','Gm'],['a','Ga'],['n','Gn'],['d','Gd']].forEach(([k, id]) => { const v = parseFloat($('#cl' + id).value); if(v > 0) o[k] = v; }); return o; })(),
+      goals: (() => { const o = {}; [['m','Gm'],['a','Ga'],['n','Gn'],['d','Gd'],['mo','Go']].forEach(([k, id]) => { const v = parseFloat($('#cl' + id).value); if(v > 0) o[k] = v; }); return o; })(),
       shifts: (() => { const o = {}; [['m','M'],['a','A'],['n','N']].forEach(([k, K]) => { const s = $('#cl' + K + 's').value, e = $('#cl' + K + 'e').value; if(s && e) o[k] = [s, e]; }); return o; })()
     });
     if(editingClinicId){
