@@ -447,6 +447,32 @@
   .code-row .icon-btn{min-width:32px; min-height:40px;}
 }
 
+/* ================= v3.3 診次 ================= */
+.shiftrow{display:flex; align-items:center; gap:6px; margin-bottom:8px;}
+.shiftrow .shl{font-size:12px; font-weight:700; color:var(--ink-soft); flex-shrink:0;}
+.shiftrow button{flex:1; min-height:38px; border:1px solid var(--line); background:#fff; border-radius:10px; font-size:14px; font-weight:700; color:var(--ink-soft); cursor:pointer;}
+.shiftrow button.active{background:var(--teal); border-color:var(--teal); color:#fff;}
+.shiftrow .shnow{font-size:11.5px; color:var(--ink-soft); flex-shrink:0; min-width:52px; text-align:right; font-family:'IBM Plex Mono',monospace;}
+.shtag{display:inline-block; font-size:11px; font-weight:700; padding:1px 8px; border-radius:10px; line-height:1.6;}
+.sh-m{background:var(--amber-soft); color:#7a5516;}
+.sh-a{background:var(--teal-soft); color:var(--teal);}
+.sh-n{background:var(--blue-soft); color:var(--blue);}
+.sh-x{background:var(--gray-soft); color:var(--ink-soft);}
+.shift-row{padding:10px 10px; border-radius:12px; border:1px solid transparent; cursor:pointer; margin-bottom:4px;}
+.shift-row:active{background:var(--gray-soft);}
+.shift-row.on{border-color:var(--teal); background:var(--teal-soft);}
+.shift-row .shtag{font-size:12.5px; padding:2px 10px; margin-right:6px;}
+.shift-row b{font-size:17px;}
+.shbar{height:8px; background:var(--gray-soft); border-radius:6px; overflow:hidden; margin:7px 0 5px;}
+.shbar > div{height:100%; border-radius:6px;}
+.best{display:inline-block; font-size:10.5px; font-weight:700; color:#fff; background:var(--money,#2e7d5b); padding:1px 7px; border-radius:10px; margin-right:4px;}
+.best.b2{background:var(--amber,#B9812E);}
+.shcfg{display:grid; gap:8px;}
+.shrow{display:grid; grid-template-columns:44px minmax(0,1fr) 18px minmax(0,1fr); gap:6px; align-items:center;}
+.shrow input{min-height:42px; padding:6px 8px;}
+.shrow span{text-align:center; color:var(--ink-soft);}
+@media (max-width:767.98px){ #view-add.active{height:calc(100vh - 176px); height:calc(100dvh - 176px - env(safe-area-inset-bottom));} }
+
 </style>
 </head>
 <body>
@@ -486,6 +512,7 @@
           <div class="chips" id="clinicChips"></div>
           <h3 class="sub-h">期間</h3>
           <div class="chips" id="rangeChips">
+            <button type="button" class="chip" data-range="today">今天</button>
             <button type="button" class="chip active" data-range="month">本月</button>
             <button type="button" class="chip" data-range="lastmonth">上月</button>
             <button type="button" class="chip" data-range="year">今年</button>
@@ -495,6 +522,8 @@
             <div class="field"><label for="rangeFrom">起始日期</label><input type="date" id="rangeFrom"></div>
             <div class="field"><label for="rangeTo">結束日期</label><input type="date" id="rangeTo"></div>
           </div>
+          <h3 class="sub-h">診次</h3>
+          <div class="chips" id="shiftChips"></div>
           <div class="hint" id="rangeLabel"></div>
         </div>
 
@@ -510,6 +539,12 @@
             <div class="value mono" id="sumTotal">$0</div>
           </div>
           <div class="hint" id="pointsHint" style="margin-top:10px;"></div>
+        </div>
+
+        <div class="card span2" id="shiftCard">
+          <h2>診次業績比較</h2>
+          <div class="hint" id="shiftHint" style="margin:-4px 0 10px;"></div>
+          <div id="shiftBody"></div>
         </div>
 
         <div class="dash-split">
@@ -555,6 +590,11 @@
           <select id="entryClinic" aria-label="診所"></select>
           <input type="date" id="insDate" aria-label="日期">
           <input type="date" id="cashDate" aria-label="日期" style="display:none;">
+        </div>
+        <div class="shiftrow" id="shiftRow">
+          <span class="shl">診次</span>
+          <button type="button" data-sh="m">早診</button><button type="button" data-sh="a">午診</button><button type="button" data-sh="n">晚診</button>
+          <span class="shnow" id="shiftNow"></span>
         </div>
         <div class="seg" id="entryTypeSeg">
           <button type="button" data-type="insurance" class="active">健保申報</button>
@@ -739,6 +779,13 @@
       <div class="field"><label for="clGeneralCommission">一般自費抽成（％）</label><input type="number" id="clGeneralCommission" step="0.1" inputmode="decimal"></div>
       <div class="field"><label for="clHighCommission">高自費抽成（％）</label><input type="number" id="clHighCommission" step="0.1" inputmode="decimal"></div>
     </div>
+    <h3 class="sub-h">診次時間（記帳時依現在時間自動判斷）</h3>
+    <div class="shcfg">
+      <div class="shrow"><b>早診</b><input type="time" id="clMs" aria-label="早診開始"><span>～</span><input type="time" id="clMe" aria-label="早診結束"></div>
+      <div class="shrow"><b>午診</b><input type="time" id="clAs" aria-label="午診開始"><span>～</span><input type="time" id="clAe" aria-label="午診結束"></div>
+      <div class="shrow"><b>晚診</b><input type="time" id="clNs" aria-label="晚診開始"><span>～</span><input type="time" id="clNe" aria-label="晚診結束"></div>
+    </div>
+    <div class="hint" style="margin-top:6px;">留空代表這間診所沒有這一診；診次之間的空檔會歸到最近的一診。</div>
     <div class="actions">
       <button type="button" class="btn btn-ghost" id="clCancel">取消</button>
       <button type="button" class="btn btn-primary" id="clSave">儲存</button>
@@ -774,6 +821,9 @@
     other:   {label:'其他',    cls:'other'}
   };
   const CAT_COLOR = {perio:'teal', endo:'amber', od:'blue', surgery:'brick', other:'gray'};
+  const SHIFTS = {m:'早診', a:'午診', n:'晚診'};
+  const SHIFT_COLOR = {m:'amber', a:'teal', n:'blue', x:'gray'};
+  const DEFAULT_SHIFTS = {m:['08:30','12:30'], a:['14:00','17:30'], n:['18:00','21:30']};
   const SUBS = {exam:'診察費', infect:'感染管制診察', xray:'X光', anes:'麻醉', wound:'創傷處理', path:'病理', plan:'專案計畫'};
   const CLINIC_COLORS = ['#0F6B5C','#3B6EA5','#B9812E','#AD4430','#6B5CA5','#2F8F8F','#9C4F96','#4C7A3C'];
   const LEGACY_SETTINGS = { insCommission: 50, pointValue: 0.8, generalCommission: 30, highCommission: 15 };
@@ -1134,13 +1184,13 @@
   function loadCloud(){ const c = lsGet('cloud', null); if(c) cloud = { ...cloud, ...c }; }
   function saveCloud(){ lsSet('cloud', cloud); }
 
-  const KEYS = {id:'i', clinicId:'c', clinicName:'cn', date:'d', code:'k', name:'nm', cat:'g', sub:'sg', points:'p', qty:'q', pointValue:'v', commission:'m', note:'n', updatedAt:'u', amount:'a', type:'t', desc:'ds'};
+  const KEYS = {id:'i', clinicId:'c', clinicName:'cn', date:'d', code:'k', name:'nm', cat:'g', sub:'sg', points:'p', qty:'q', pointValue:'v', commission:'m', note:'n', updatedAt:'u', amount:'a', type:'t', desc:'ds', shift:'s'};
   const REV = Object.fromEntries(Object.entries(KEYS).map(([a, b]) => [b, a]));
   const KEY_ORDER = Object.keys(KEYS);
   function pack(o){ const r = {}; for(const k of KEY_ORDER){ const v = o[k]; if(v !== undefined && v !== null && v !== '') r[KEYS[k]] = v; } return r; }
   function unpack(o){ const r = {}; for(const k in o) r[REV[k] || k] = o[k]; return r; }
   const pick = (o, fields) => { const r = {}; for(const f of fields){ if(o[f] !== undefined && o[f] !== null && o[f] !== '') r[f] = o[f]; } return r; };
-  const CLINIC_F = ['id','name','color','insCommission','pointValue','generalCommission','highCommission','updatedAt'];
+  const CLINIC_F = ['id','name','color','insCommission','pointValue','generalCommission','highCommission','shifts','updatedAt'];
   const CODE_F = ['code','name','points','cat','sub','updatedAt'];
   const byI = (a, b) => a.i < b.i ? -1 : a.i > b.i ? 1 : 0;
 
@@ -1338,6 +1388,44 @@
   const insSearch = $('#insCodeSearch');
 
   $$('#entryTypeSeg button').forEach(btn => btn.addEventListener('click', () => setEntryType(btn.dataset.type)));
+  /* ---- 診次（早／午／晚診） ---- */
+  const toMin = t => { const [h, m] = String(t).split(':').map(Number); return h * 60 + (m || 0); };
+  const nowHHMM = () => { const d = new Date(); return pad(d.getHours()) + ':' + pad(d.getMinutes()); };
+  function getShifts(c){
+    const s = c && c.shifts;
+    return s && ['m','a','n'].some(k => s[k] && s[k][0] && s[k][1]) ? s : DEFAULT_SHIFTS;
+  }
+  function classifyShift(clinic, hhmm){
+    const sh = getShifts(clinic), t = toMin(hhmm);
+    let best = '', bd = 1e9;
+    for(const k of ['m','a','n']){
+      const r = sh[k]; if(!r || !r[0] || !r[1]) continue;
+      const s = toMin(r[0]), e = toMin(r[1]);
+      if(t >= s && t < e) return k;
+      const d = t < s ? s - t : t - e + 1;
+      if(d < bd){ bd = d; best = k; }
+    }
+    return best;
+  }
+  const shiftText = c => ['m','a','n'].map(k => { const r = getShifts(c)[k]; return r && r[0] && r[1] ? `${SHIFTS[k]} ${r[0]}–${r[1]}` : ''; }).filter(Boolean).join('　');
+  let curShift = '', shiftManual = false;
+  function renderShiftRow(){
+    $$('#shiftRow button').forEach(b => b.classList.toggle('active', b.dataset.sh === curShift));
+    $('#shiftNow').textContent = shiftManual ? '手動' : nowHHMM() + ' 自動';
+  }
+  function autoShift(){
+    if(shiftManual) return;
+    const c = clinicById($('#entryClinic').value);
+    curShift = c ? classifyShift(c, nowHHMM()) : '';
+    renderShiftRow();
+  }
+  $('#shiftRow').addEventListener('click', e => {
+    const b = e.target.closest('button[data-sh]'); if(!b) return;
+    if(shiftManual && curShift === b.dataset.sh){ shiftManual = false; autoShift(); return; }
+    curShift = b.dataset.sh; shiftManual = true; renderShiftRow();
+  });
+  document.addEventListener('visibilitychange', () => { if(document.visibilityState === 'visible') autoShift(); });
+
   function setEntryType(type){
     entryType = type;
     $$('#entryTypeSeg button').forEach(b => b.classList.toggle('active', b.dataset.type === type));
@@ -1364,11 +1452,12 @@
     if(!$('#insDate').value) $('#insDate').value = todayStr();
     if(!$('#cashDate').value) $('#cashDate').value = todayStr();
     if(!editingInsId && !editingCashId) applyClinicDefaults();
+    if(!editingInsId && !editingCashId){ shiftManual = false; autoShift(); }
     renderQuick(); renderRecent();
   }
   $('#entryClinic').addEventListener('change', () => {
     lsSet('lastClinic', $('#entryClinic').value);
-    applyClinicDefaults(); renderRecent();
+    autoShift(); applyClinicDefaults(); renderRecent();
   });
 
   function applyClinicDefaults(){
@@ -1514,11 +1603,12 @@
   }
   function resetCashForm(){ $('#cashAmount').value = ''; $('#cashDesc').value = ''; updateCashPreview(); }
   $('#cancelEdit').addEventListener('click', () => {
-    editingInsId = null; editingCashId = null; setEditing(false); resetInsForm(); resetCashForm(); setEntryType('insurance'); renderQuick();
+    editingInsId = null; editingCashId = null; setEditing(false); resetInsForm(); resetCashForm(); setEntryType('insurance'); shiftManual = false; autoShift(); renderQuick();
   });
 
   $('#insSave').addEventListener('click', async () => {
     if(!selectedCode){ toast('請先選擇申報代碼'); return; }
+    autoShift();
     const clinic = clinicById($('#entryClinic').value);
     if(!clinic){ toast('請先選擇診所'); return; }
     const rec = touch({
@@ -1528,14 +1618,14 @@
       code: selectedCode.code, name: selectedCode.name, cat: selectedCode.cat, sub: selectedCode.sub || '',
       points: selectedCode.points, qty: Math.max(1, parseFloat($('#insQty').value) || 1),
       pointValue: parseFloat($('#insPointValue').value) || 0, commission: parseFloat($('#insCommission').value) || 0,
-      note: $('#insNote').value.trim()
+      note: $('#insNote').value.trim(), shift: curShift
     });
     const editing = !!editingInsId;
     if(editing){ const i = state.entries.findIndex(e => e.id === editingInsId); if(i > -1) state.entries[i] = rec; else state.entries.push(rec); }
     else state.entries.push(rec);
     persist();
-    editingInsId = null; setEditing(false);
-    resetInsForm();
+    editingInsId = null; setEditing(false); shiftManual = false;
+    resetInsForm(); autoShift();
     toast(editing ? '已更新紀錄' : `已儲存 ${rec.code}（預估 ${fmt(incomeOfIns(rec))}）`);
     if(editing) goTo('dash'); else { renderQuick(); renderRecent(); }
   });
@@ -1545,24 +1635,26 @@
     if(!clinic){ toast('請先選擇診所'); return; }
     const amt = parseFloat($('#cashAmount').value);
     if(!amt || amt <= 0){ toast('請輸入自費金額'); return; }
+    autoShift();
     const rec = touch({
       id: editingCashId || uid(),
       clinicId: clinic.id, clinicName: clinic.name,
       date: $('#cashDate').value || todayStr(),
       type: entryType, amount: amt, commission: parseFloat($('#cashCommission').value) || 0,
-      desc: $('#cashDesc').value.trim()
+      desc: $('#cashDesc').value.trim(), shift: curShift
     });
     const editing = !!editingCashId;
     if(editing){ const i = state.cash.findIndex(e => e.id === editingCashId); if(i > -1) state.cash[i] = rec; else state.cash.push(rec); }
     else state.cash.push(rec);
     persist();
-    editingCashId = null; setEditing(false);
-    resetCashForm();
+    editingCashId = null; setEditing(false); shiftManual = false;
+    resetCashForm(); autoShift();
     toast(editing ? '已更新紀錄' : `已儲存自費紀錄（預估 ${fmt(incomeOfCash(rec))}）`);
     if(editing) goTo('dash'); else renderRecent();
   });
 
   /* ---- 紀錄列（總覽與「最近紀錄」共用） ---- */
+  const shiftTag = e => e.shift && SHIFTS[e.shift] ? ` <span class="shtag sh-${e.shift}">${SHIFTS[e.shift]}</span>` : '';
   function entryRowHTML(e, showClinic){
     const dot = showClinic ? `<span class="dot" style="background:${esc((clinicById(e.clinicId) || {}).color || '#999')};" title="${esc(e.clinicName)}"></span>` : '';
     const acts = `<div class="entry-actions"><button type="button" class="icon-btn" data-act="edit" aria-label="編輯">✎</button><button type="button" class="icon-btn" data-act="del" aria-label="刪除">🗑</button></div>`;
@@ -1571,7 +1663,7 @@
       return `<div class="entry-row" data-kind="ins" data-id="${esc(e.id)}">
         <div class="entry-main">
           <div class="name">${dot}<span class="badge ${cat.cls}">${cat.label}</span> ${esc(e.code)} ${esc(e.name)}</div>
-          <div class="meta">${esc(e.date)} · ${esc(e.qty)}件 × ${esc(e.points)}點 × ${esc(e.pointValue)} · 抽成${esc(e.commission)}%${e.note ? ' · ' + esc(e.note) : ''}</div>
+          <div class="meta">${esc(e.date)}${shiftTag(e)} · ${esc(e.qty)}件 × ${esc(e.points)}點 × ${esc(e.pointValue)} · 抽成${esc(e.commission)}%${e.note ? ' · ' + esc(e.note) : ''}</div>
         </div>
         <div style="display:flex; align-items:center; gap:8px;"><div class="entry-amt">${fmt(incomeOfIns(e))}</div>${acts}</div>
       </div>`;
@@ -1579,7 +1671,7 @@
     return `<div class="entry-row" data-kind="cash" data-id="${esc(e.id)}">
       <div class="entry-main">
         <div class="name">${dot}<span class="badge other">${e.type === 'high' ? '高自費' : '一般自費'}</span> ${esc(e.desc) || '（未填說明）'}</div>
-        <div class="meta">${esc(e.date)} · 金額${Number(e.amount).toLocaleString()} · 抽成${esc(e.commission)}%</div>
+        <div class="meta">${esc(e.date)}${shiftTag(e)} · 金額${Number(e.amount).toLocaleString()} · 抽成${esc(e.commission)}%</div>
       </div>
       <div style="display:flex; align-items:center; gap:8px;"><div class="entry-amt">${fmt(incomeOfCash(e))}</div>${acts}</div>
     </div>`;
@@ -1610,7 +1702,7 @@
       if(kind === 'ins'){
         const rec = state.entries.find(x => x.id === id); if(!rec) return;
         goTo('add'); setEntryType('insurance');
-        editingInsId = id; editingCashId = null; setEditing(true);
+        editingInsId = id; editingCashId = null; setEditing(true); curShift = rec.shift || ''; shiftManual = true; renderShiftRow();
         $('#entryClinic').value = rec.clinicId;
         $('#insDate').value = rec.date;
         selectedCode = { code:rec.code, name:rec.name, points:rec.points, cat:rec.cat, sub:rec.sub || '' };
@@ -1621,7 +1713,7 @@
       } else {
         const rec = state.cash.find(x => x.id === id); if(!rec) return;
         goTo('add'); setEntryType(rec.type);
-        editingCashId = id; editingInsId = null; setEditing(true);
+        editingCashId = id; editingInsId = null; setEditing(true); curShift = rec.shift || ''; shiftManual = true; renderShiftRow();
         $('#entryClinic').value = rec.clinicId;
         $('#cashAmountLabel').textContent = rec.type === 'high' ? '高自費金額' : '一般自費金額';
         $('#cashDate').value = rec.date; $('#cashAmount').value = rec.amount;
@@ -1636,7 +1728,7 @@
   /* =====================================================================
      總覽
      ===================================================================== */
-  let currentRange = 'month', currentClinicFilter = 'all';
+  let currentRange = 'month', currentClinicFilter = 'all', currentShiftFilter = 'all';
 
   function renderClinicChips(){
     const el = $('#clinicChips');
@@ -1657,13 +1749,46 @@
   function getRange(){
     const n = new Date(), y = n.getFullYear(), m = n.getMonth();
     let from, to;
-    if(currentRange === 'month'){ from = ymd(new Date(y, m, 1)); to = ymd(new Date(y, m + 1, 0)); }
+    if(currentRange === 'today'){ from = to = todayStr(); }
+    else if(currentRange === 'month'){ from = ymd(new Date(y, m, 1)); to = ymd(new Date(y, m + 1, 0)); }
     else if(currentRange === 'lastmonth'){ from = ymd(new Date(y, m - 1, 1)); to = ymd(new Date(y, m, 0)); }
     else if(currentRange === 'year'){ from = `${y}-01-01`; to = `${y}-12-31`; }
     else { from = $('#rangeFrom').value || ymd(new Date(y, m, 1)); to = $('#rangeTo').value || todayStr(); if(from > to) [from, to] = [to, from]; }
     return { from, to };
   }
   const inRange = (d, r) => d >= r.from && d <= r.to;   // 日期是 YYYY-MM-DD 字串，直接比較即可
+
+  function renderShiftAnalysis(ins, cash){
+    const keys = ['m','a','n','x'], d = {};
+    keys.forEach(k => d[k] = { inc:0, pts:0, n:0, days:new Set() });
+    ins.forEach(e => { const k = SHIFTS[e.shift] ? e.shift : 'x'; d[k].inc += incomeOfIns(e); d[k].pts += e.points * e.qty; d[k].n++; d[k].days.add(e.date); });
+    cash.forEach(e => { const k = SHIFTS[e.shift] ? e.shift : 'x'; d[k].inc += incomeOfCash(e); d[k].n++; d[k].days.add(e.date); });
+    const total = keys.reduce((s, k) => s + d[k].inc, 0);
+    // 篩選晶片（未分診只在有資料時顯示）
+    const chips = [['all', '全部'], ['m', '早診'], ['a', '午診'], ['n', '晚診']];
+    if(d.x.n) chips.push(['x', '未分診']);
+    if(!chips.some(c => c[0] === currentShiftFilter)) currentShiftFilter = 'all';
+    $('#shiftChips').innerHTML = chips.map(([k, l]) => `<button type="button" class="chip ${k === currentShiftFilter ? 'active' : ''}" data-shift="${k}">${l}</button>`).join('');
+    const shown = keys.filter(k => d[k].n);
+    $('#shiftCard').style.display = shown.length ? '' : 'none';
+    if(!shown.length) return;
+    const withDays = shown.filter(k => k !== 'x');
+    const bestTotal = withDays.length > 1 ? withDays.reduce((a, k) => d[k].inc > d[a].inc ? k : a, withDays[0]) : null;
+    const bestAvg = withDays.length > 1 ? withDays.reduce((a, k) => d[k].inc / d[k].days.size > d[a].inc / d[a].days.size ? k : a, withDays[0]) : null;
+    $('#shiftHint').textContent = '依上方選的診所與期間統計；點一列可只看那一診。平均＝總額 ÷ 有紀錄的天數。';
+    $('#shiftBody').innerHTML = shown.map(k => {
+      const x = d[k], avg = x.inc / x.days.size, pct = total ? Math.round(x.inc / total * 100) : 0;
+      const tags = (k === bestTotal ? '<span class="best">總額最高</span>' : '') + (k === bestAvg ? '<span class="best b2">平均最高</span>' : '');
+      return `<div class="shift-row ${k === currentShiftFilter ? 'on' : ''}" data-shift="${k}" role="button" tabindex="0">
+        <div class="flex-between"><span><span class="shtag sh-${k}">${k === 'x' ? '未分診' : SHIFTS[k]}</span>${tags}</span><b class="mono">${fmt(x.inc)}</b></div>
+        <div class="shbar"><div style="width:${pct}%; background:var(--${SHIFT_COLOR[k]});"></div></div>
+        <div class="hint">占 ${pct}% ・ 平均每天 ${fmt(avg)}（${x.days.size} 天）・ ${x.pts.toLocaleString()} 點 ・ ${x.n} 筆</div>
+      </div>`;
+    }).join('');
+  }
+  function setShiftFilter(k){ currentShiftFilter = currentShiftFilter === k && k !== 'all' ? 'all' : k; renderDash(); }
+  $('#shiftChips').addEventListener('click', e => { const b = e.target.closest('[data-shift]'); if(b) setShiftFilter(b.dataset.shift); });
+  $('#shiftBody').addEventListener('click', e => { const r = e.target.closest('[data-shift]'); if(r) setShiftFilter(r.dataset.shift); });
 
   function renderDash(){
     renderClinicChips();
@@ -1673,8 +1798,14 @@
     if(currentClinicFilter !== 'all'){
       ins = ins.filter(e => e.clinicId === currentClinicFilter); cash = cash.filter(e => e.clinicId === currentClinicFilter);
     }
+    renderShiftAnalysis(ins, cash);
+    if(currentShiftFilter !== 'all'){
+      const f = currentShiftFilter === 'x' ? '' : currentShiftFilter;
+      ins = ins.filter(e => (e.shift || '') === f); cash = cash.filter(e => (e.shift || '') === f);
+    }
     const active = currentClinicFilter !== 'all' ? clinicById(currentClinicFilter) : null;
-    $('#salaryTitle').textContent = active ? `${active.name}｜薪資結算` : '全部診所｜薪資結算';
+    const shLab = currentShiftFilter === 'all' ? '' : '・' + (currentShiftFilter === 'x' ? '未分診' : SHIFTS[currentShiftFilter]);
+    $('#salaryTitle').textContent = (active ? `${active.name}` : '全部診所') + shLab + '｜薪資結算';
     $('#totalLabel').textContent = active ? `${active.name} 本期預估所得` : '本期預估總所得（全部診所）';
 
     let insIncome = 0, totalPoints = 0;
@@ -1844,6 +1975,7 @@
           <div>一般自費抽成：<b>${esc(c.generalCommission)}%</b></div>
           <div>高自費抽成：<b>${esc(c.highCommission)}%</b></div>
         </div>
+        <div class="hint" style="margin-top:8px;">${esc(shiftText(c))}</div>
       </div>`).join('');
   }
   let editingClinicId = null;
@@ -1864,6 +1996,8 @@
     $('#clPointValue').value = existing ? existing.pointValue : 0.8;
     $('#clGeneralCommission').value = existing ? existing.generalCommission : 30;
     $('#clHighCommission').value = existing ? existing.highCommission : 15;
+    const sh = getShifts(existing);
+    [['m','M'],['a','A'],['n','N']].forEach(([k, K]) => { $('#cl' + K + 's').value = (sh[k] && sh[k][0]) || ''; $('#cl' + K + 'e').value = (sh[k] && sh[k][1]) || ''; });
     $('#clinicModalBg').classList.add('show');
   }
   $('#openAddClinic').addEventListener('click', () => openClinicModal(null));
@@ -1875,7 +2009,8 @@
     const rec = touch({
       id: editingClinicId || uid(), name, color: $('#clColor').value || CLINIC_COLORS[0],
       insCommission: num('#clInsCommission'), pointValue: num('#clPointValue'),
-      generalCommission: num('#clGeneralCommission'), highCommission: num('#clHighCommission')
+      generalCommission: num('#clGeneralCommission'), highCommission: num('#clHighCommission'),
+      shifts: (() => { const o = {}; [['m','M'],['a','A'],['n','N']].forEach(([k, K]) => { const s = $('#cl' + K + 's').value, e = $('#cl' + K + 'e').value; if(s && e) o[k] = [s, e]; }); return o; })()
     });
     if(editingClinicId){
       const i = state.clinics.findIndex(c => c.id === editingClinicId);
