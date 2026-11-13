@@ -497,6 +497,30 @@
 #confetti i{position:absolute; top:-14px; width:9px; height:14px; border-radius:2px; animation:fall linear forwards;}
 @keyframes fall{to{transform:translateY(110vh) rotate(720deg); opacity:.9;}}
 
+/* ================= v3.5 薪資對帳 ================= */
+#view-pay .card + .card,#payCards .card + .card,#paySummary + #payCards{margin-top:14px;}
+#paySummary:not(:empty){margin-top:14px;}
+.monthnav{display:flex; align-items:center; justify-content:space-between; gap:10px; background:var(--gray-soft); border-radius:12px; padding:4px;}
+.monthnav .icon-btn{font-size:24px; min-width:48px; min-height:44px; background:#fff; border:none; cursor:pointer; color:var(--ink);}
+.monthnav .icon-btn:disabled{opacity:.35;}
+.monthlabel{font-size:17px; font-weight:700; font-family:'IBM Plex Mono',monospace;}
+.paytbl{width:100%; border-collapse:collapse; font-size:14px;}
+.paytbl th{font-size:12px; color:var(--ink-soft); font-weight:700; padding:4px 4px 6px; text-align:left;}
+.paytbl td{padding:6px 4px; border-top:1px solid var(--line); vertical-align:middle;}
+.paytbl th.num,.paytbl td.num{text-align:right;}
+.paytbl input[type=number]{min-height:40px; padding:6px 8px; text-align:right; font-family:'IBM Plex Mono',monospace; min-width:92px;}
+.paytbl tr.tot td{font-weight:700; border-top:2px solid var(--line);}
+.paytbl tr.tot td.mono,.paytbl tr.tot td[data-t]{font-size:16px;}
+.dpos{color:var(--money,#2e7d5b); font-weight:700; font-family:'IBM Plex Mono',monospace;}
+.dneg{color:var(--brick); font-weight:700; font-family:'IBM Plex Mono',monospace;}
+.pp{display:block; font-size:11px; color:var(--ink-soft); font-weight:600;}
+.paynote{margin-top:10px;}
+@media (min-width:1024px){
+  #view-pay{max-width:760px;}
+}
+.paytbl td:first-child,.paytbl th:first-child{white-space:nowrap; width:1%; padding-right:10px;}
+.pay-card .actions{display:flex; justify-content:flex-end; gap:8px;}
+
 </style>
 </head>
 <body>
@@ -520,6 +544,8 @@
         <svg class="tab-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 6h12M8 12h12M8 18h12M4 6h.01M4 12h.01M4 18h.01"/></svg><span>代碼庫</span></button>
       <button type="button" data-view="clinics">
         <svg class="tab-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 21V6l8-3 8 3v15M2 21h20M9 21v-5h6v5M9 9.500h2M13 9.500h2M9 13h2M13 13h2"/></svg><span>診所</span></button>
+      <button type="button" data-view="pay">
+        <svg class="tab-ico" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="6" width="18" height="12" rx="2"/><circle cx="12" cy="12" r="2.5"/><path d="M6 9.500v.01M18 14.500v.01"/></svg><span>對帳</span></button>
     </nav>
   </div>
   <button type="button" class="sync" id="syncBadge" data-s="off" aria-live="polite"><span class="sdot"></span><span id="syncText">未同步</span></button>
@@ -707,6 +733,30 @@
       <div class="chips" id="codeCatChips"></div>
       <div class="chips" id="codeSubChips"></div>
       <div id="codeList"></div>
+    </div>
+  </section>
+
+  <!-- ===== PAYSLIP RECONCILIATION ===== -->
+  <section id="view-pay" class="view">
+    <div class="card">
+      <div class="flex-between" style="margin-bottom:6px;">
+        <h2>薪資對帳</h2>
+      </div>
+      <p class="hint" style="margin-bottom:10px;">每月輸入實際收到的薪資，和自己記帳的預估比對，看看有沒有落差。</p>
+      <div class="monthnav">
+        <button type="button" class="icon-btn" id="payPrev" aria-label="上個月">‹</button>
+        <div id="payMonthLabel" class="monthlabel"></div>
+        <button type="button" class="icon-btn" id="payNext" aria-label="下個月">›</button>
+      </div>
+    </div>
+    <div id="paySummary"></div>
+    <div id="payCards"></div>
+    <div class="card" id="payHistoryCard" style="display:none;">
+      <h2>近 6 個月對照</h2>
+      <table class="mini" style="width:100%;">
+        <thead><tr><th>月份</th><th class="num">預估</th><th class="num">實領</th><th class="num">差額</th></tr></thead>
+        <tbody id="payHistory"></tbody>
+      </table>
     </div>
   </section>
 
@@ -1111,7 +1161,7 @@
   const incomeOfIns  = e => e.points * e.qty * e.pointValue * (e.commission / 100);
   const incomeOfCash = e => e.amount * (e.commission / 100);
 
-  let state = { codes: [], clinics: [], entries: [], cash: [], tomb: [] };
+  let state = { codes: [], clinics: [], entries: [], cash: [], pay: [], tomb: [] };
 
   let toastTimer;
   function toast(msg){
@@ -1129,7 +1179,7 @@
   function lsSet(k, v){ try{ localStorage.setItem(LS + k, JSON.stringify(v)); return true; }catch(e){ return false; } }
 
   function persistLocal(){
-    const ok = ['codes','clinics','entries','cash','tomb'].map(k => lsSet(k, state[k])).every(Boolean);
+    const ok = ['codes','clinics','entries','cash','pay','tomb'].map(k => lsSet(k, state[k])).every(Boolean);
     if(!ok) toast('這個瀏覽器無法儲存資料（可能是無痕模式）');
   }
   function persist(){
@@ -1153,7 +1203,7 @@
       if(!tomb.has(t.id) || tomb.get(t.id) < t.at) tomb.set(t.id, t.at);
     }
     const out = {};
-    for(const col of ['codes','clinics','entries','cash']){
+    for(const col of ['codes','clinics','entries','cash','pay']){
       const m = new Map();
       for(const r of [...(remote[col] || []), ...(local[col] || [])]){   // 本機放後面：時間相同時以本機為準
         if(!r || (col === 'codes' ? !r.code : !r.id)) continue;
@@ -1170,7 +1220,7 @@
     return out;
   }
   function applyMerged(m){
-    state.codes = m.codes; state.clinics = m.clinics; state.entries = m.entries; state.cash = m.cash; state.tomb = m.tomb;
+    state.codes = m.codes; state.clinics = m.clinics; state.entries = m.entries; state.cash = m.cash; state.pay = m.pay; state.tomb = m.tomb;
     normalizeState();
     persistLocal();
   }
@@ -1179,6 +1229,7 @@
      資料整理與代碼表更新
      ===================================================================== */
   function normalizeState(){
+    if(!Array.isArray(state.pay)) state.pay = [];
     // 代碼：以代碼本身當 id，去除重複
     const m = new Map();
     for(const c of state.codes){
@@ -1253,6 +1304,7 @@
       v: 1,
       clinics: s.clinics.map(c => pick(c, CLINIC_F)).sort((a, b) => a.id < b.id ? -1 : 1),
       codes: s.codes.filter(isCustomCode).map(c => pick(c, CODE_F)).sort((a, b) => a.code < b.code ? -1 : 1),
+      pay: s.pay.map(r => pick(r, ['id','clinicId','month','ins','cash','note','updatedAt'])).sort((a, b) => a.id < b.id ? -1 : 1),
       tomb: s.tomb.slice().sort((a, b) => a.id < b.id ? -1 : 1)
     });
     const months = {};
@@ -1275,7 +1327,7 @@
     return f.content;
   }
   async function parseGist(g){
-    const remote = { clinics:[], codes:[], tomb:[], entries:[], cash:[] };
+    const remote = { clinics:[], codes:[], tomb:[], entries:[], cash:[], pay:[] };
     const raw = {};
     for(const [name, f] of Object.entries(g.files || {})){
       if(name !== 'meta.json' && !/^entries-.+\.json$/.test(name)) continue;
@@ -1284,7 +1336,7 @@
       let j;
       try{ j = JSON.parse(text.trim() === '' ? '{}' : text); }catch(e){ throw new Error('雲端檔案 ' + name + ' 格式錯誤'); }
       if(name === 'meta.json'){
-        remote.clinics = j.clinics || []; remote.codes = j.codes || []; remote.tomb = j.tomb || [];
+        remote.clinics = j.clinics || []; remote.codes = j.codes || []; remote.tomb = j.tomb || []; remote.pay = j.pay || [];
       } else {
         (j.e || []).forEach(o => remote.entries.push(unpack(o)));
         (j.c || []).forEach(o => remote.cash.push(unpack(o)));
@@ -1423,13 +1475,14 @@
     if(view === 'dash') renderDash();
     if(view === 'codes') renderCodes();
     if(view === 'clinics'){ renderClinics(); renderCloudForm(); }
+    if(view === 'pay') renderPay();
     if(view === 'add') prepAddView();
     window.scrollTo(0, 0);
   }
   $('#goAddClinic').addEventListener('click', () => goTo('clinics'));
 
   function renderAll(){
-    renderDash(); renderCodes(); renderClinics(); refreshClinicOptions(); renderQuick(); renderRecent(); renderCloudForm();
+    renderDash(); renderCodes(); renderClinics(); refreshClinicOptions(); renderQuick(); renderRecent(); renderCloudForm(); renderPay();
   }
 
   /* =====================================================================
@@ -2192,6 +2245,116 @@
   });
 
   /* =====================================================================
+     薪資對帳：每月輸入實領的健保／自費薪資，與記帳預估比對
+     ===================================================================== */
+  let payMonth = todayStr().slice(0, 7);
+  const payId = (cid, m) => `pay|${cid}|${m}`;
+  const signed = v => (v >= 0 ? '+' : '−') + fmt(Math.abs(v));
+  const numOrNull = v => { const n = parseFloat(v); return isNaN(n) ? null : n; };
+  function estFor(cid, month){
+    let ins = 0, cash = 0;
+    state.entries.forEach(e => { if(e.clinicId === cid && e.date.slice(0, 7) === month) ins += incomeOfIns(e); });
+    state.cash.forEach(e => { if(e.clinicId === cid && e.date.slice(0, 7) === month) cash += incomeOfCash(e); });
+    return { ins, cash, total: ins + cash };
+  }
+  const payRec = (cid, m) => state.pay.find(r => r.id === payId(cid, m));
+  const diffHTML = (act, est) => {
+    if(act === null || act === undefined) return '<span class="hint">—</span>';
+    const d = act - est, pct = est ? ` <span class="pp">${d >= 0 ? '+' : '−'}${Math.abs(d / est * 100).toFixed(1)}%</span>` : '';
+    return `<span class="${d >= 0 ? 'dpos' : 'dneg'}">${signed(d)}</span>${pct}`;
+  };
+  function shiftMonth(m, delta){ const [y, mo] = m.split('-').map(Number), d = new Date(y, mo - 1 + delta, 1); return `${d.getFullYear()}-${pad(d.getMonth() + 1)}`; }
+  function renderPay(){
+    $('#payMonthLabel').textContent = payMonth.replace('-', ' 年 ') + ' 月';
+    $('#payNext').disabled = payMonth >= todayStr().slice(0, 7);
+    if(!state.clinics.length){
+      $('#paySummary').innerHTML = ''; $('#payHistoryCard').style.display = 'none';
+      $('#payCards').innerHTML = '<div class="card"><div class="empty-state">先到「診所」頁新增診所，才能輸入實領薪資。</div></div>';
+      return;
+    }
+    $('#payCards').innerHTML = state.clinics.map(c => {
+      const est = estFor(c.id, payMonth), r = payRec(c.id, payMonth);
+      const ai = r && r.ins != null ? r.ins : null, ac = r && r.cash != null ? r.cash : null;
+      const tot = r ? (ai || 0) + (ac || 0) : null;
+      return `<div class="card pay-card" data-c="${esc(c.id)}" data-ei="${est.ins}" data-ec="${est.cash}">
+        <div class="flex-between" style="margin-bottom:8px;"><h2 style="margin:0;"><span class="dot" style="background:${esc(c.color)}; width:11px; height:11px;"></span> ${esc(c.name)}</h2><span class="hint">${r ? '已儲存' : '尚未輸入'}</span></div>
+        <table class="paytbl">
+          <thead><tr><th></th><th class="num">預估</th><th class="num">實領</th><th class="num">差額</th></tr></thead>
+          <tbody>
+            <tr><td>健保</td><td class="num mono">${fmt(est.ins)}</td><td><input type="number" inputmode="decimal" data-f="ins" value="${ai == null ? '' : ai}" placeholder="0" aria-label="${esc(c.name)} 健保實領"></td><td class="num" data-d="ins">${diffHTML(ai, est.ins)}</td></tr>
+            <tr><td>自費</td><td class="num mono">${fmt(est.cash)}</td><td><input type="number" inputmode="decimal" data-f="cash" value="${ac == null ? '' : ac}" placeholder="0" aria-label="${esc(c.name)} 自費實領"></td><td class="num" data-d="cash">${diffHTML(ac, est.cash)}</td></tr>
+            <tr class="tot"><td>合計</td><td class="num mono">${fmt(est.total)}</td><td class="num mono" data-t="1">${tot == null ? '<span class="hint">—</span>' : fmt(tot)}</td><td class="num" data-d="tot">${diffHTML(tot, est.total)}</td></tr>
+          </tbody>
+        </table>
+        <input type="text" class="paynote" data-f="note" value="${esc(r ? r.note || '' : '')}" placeholder="備註（例如：含獎金、扣勞健保）" aria-label="備註">
+        <div class="actions" style="margin-top:10px;">
+          ${r ? '<button type="button" class="btn btn-ghost btn-sm" data-pact="clear">清除</button>' : ''}
+          <button type="button" class="btn btn-primary btn-sm" data-pact="save">儲存</button>
+        </div>
+      </div>`;
+    }).join('');
+    renderPaySummary();
+  }
+  function renderPaySummary(){
+    const rows = state.clinics.map(c => ({ c, est:estFor(c.id, payMonth), r:payRec(c.id, payMonth) })).filter(x => x.r);
+    const el = $('#paySummary');
+    if(state.clinics.length > 1 && rows.length){
+      const e = rows.reduce((s, x) => s + x.est.total, 0), a = rows.reduce((s, x) => s + (x.r.ins || 0) + (x.r.cash || 0), 0);
+      const ei = rows.reduce((s, x) => s + x.est.ins, 0), ai = rows.reduce((s, x) => s + (x.r.ins || 0), 0);
+      const ec = rows.reduce((s, x) => s + x.est.cash, 0), ac = rows.reduce((s, x) => s + (x.r.cash || 0), 0);
+      el.innerHTML = `<div class="card"><h2>${payMonth.replace('-', ' 年 ')} 月總計（已輸入 ${rows.length} 間）</h2>
+        <table class="paytbl"><thead><tr><th></th><th class="num">預估</th><th class="num">實領</th><th class="num">差額</th></tr></thead><tbody>
+          <tr><td>健保</td><td class="num mono">${fmt(ei)}</td><td class="num mono">${fmt(ai)}</td><td class="num">${diffHTML(ai, ei)}</td></tr>
+          <tr><td>自費</td><td class="num mono">${fmt(ec)}</td><td class="num mono">${fmt(ac)}</td><td class="num">${diffHTML(ac, ec)}</td></tr>
+          <tr class="tot"><td>合計</td><td class="num mono">${fmt(e)}</td><td class="num mono">${fmt(a)}</td><td class="num">${diffHTML(a, e)}</td></tr>
+        </tbody></table></div>`;
+    } else el.innerHTML = '';
+    // 近 6 個月
+    const body = [];
+    for(let i = 0; i < 6; i++){
+      const m = shiftMonth(payMonth, -i);
+      const rec = state.clinics.map(c => ({ est:estFor(c.id, m), r:payRec(c.id, m) })).filter(x => x.r);
+      const all = state.clinics.reduce((s, c) => s + estFor(c.id, m).total, 0);
+      if(rec.length){
+        const e = rec.reduce((s, x) => s + x.est.total, 0), a = rec.reduce((s, x) => s + (x.r.ins || 0) + (x.r.cash || 0), 0);
+        body.push(`<tr><td>${m}</td><td class="num mono">${fmt(e)}</td><td class="num mono">${fmt(a)}</td><td class="num">${diffHTML(a, e)}</td></tr>`);
+      } else body.push(`<tr><td>${m}</td><td class="num mono">${fmt(all)}</td><td class="num"><span class="hint">—</span></td><td class="num"><span class="hint">—</span></td></tr>`);
+    }
+    $('#payHistory').innerHTML = body.join('');
+    $('#payHistoryCard').style.display = '';
+  }
+  function payCardCalc(card){
+    const g = f => numOrNull(card.querySelector(`[data-f="${f}"]`).value);
+    const ei = Number(card.dataset.ei), ec = Number(card.dataset.ec);
+    const ai = g('ins'), ac = g('cash'), any = ai !== null || ac !== null;
+    card.querySelector('[data-d="ins"]').innerHTML = diffHTML(ai, ei);
+    card.querySelector('[data-d="cash"]').innerHTML = diffHTML(ac, ec);
+    const tot = any ? (ai || 0) + (ac || 0) : null;
+    card.querySelector('[data-t]').innerHTML = tot === null ? '<span class="hint">—</span>' : fmt(tot);
+    card.querySelector('[data-d="tot"]').innerHTML = diffHTML(tot, ei + ec);
+  }
+  $('#payCards').addEventListener('input', e => { const card = e.target.closest('.pay-card'); if(card && e.target.type === 'number') payCardCalc(card); });
+  $('#payCards').addEventListener('click', e => {
+    const btn = e.target.closest('button[data-pact]'); if(!btn) return;
+    const card = btn.closest('.pay-card'), cid = card.dataset.c, c = clinicById(cid), id = payId(cid, payMonth);
+    if(btn.dataset.pact === 'clear'){
+      confirmAction('清除這個月的實領薪資？', `${c ? c.name : ''} ${payMonth} 的實領紀錄會被刪除。`, () => {
+        state.pay = state.pay.filter(r => r.id !== id); addTomb(id); persist(); renderPay(); toast('已清除');
+      }, '清除');
+      return;
+    }
+    const ins = numOrNull(card.querySelector('[data-f="ins"]').value), cash = numOrNull(card.querySelector('[data-f="cash"]').value);
+    if(ins === null && cash === null){ toast('請至少輸入健保或自費其中一項'); return; }
+    const rec = touch({ id, clinicId:cid, clinicName:c ? c.name : '', month:payMonth, ins, cash, note:card.querySelector('[data-f="note"]').value.trim() });
+    state.pay = state.pay.filter(r => r.id !== id); state.pay.push(rec);
+    state.tomb = state.tomb.filter(t => t.id !== id);
+    persist(); renderPay();
+    toast(`已儲存 ${payMonth} 實領 ${fmt((ins || 0) + (cash || 0))}`);
+  });
+  $('#payPrev').addEventListener('click', () => { payMonth = shiftMonth(payMonth, -1); renderPay(); });
+  $('#payNext').addEventListener('click', () => { if(payMonth < todayStr().slice(0, 7)){ payMonth = shiftMonth(payMonth, 1); renderPay(); } });
+
+  /* =====================================================================
      備份
      ===================================================================== */
   $('#exportData').addEventListener('click', () => {
@@ -2207,7 +2370,7 @@
     const file = e.target.files[0]; if(!file) return;
     try{
       const data = JSON.parse(await file.text());
-      applyMerged(mergeStates(state, { codes:data.codes || [], clinics:data.clinics || [], entries:data.entries || [], cash:data.cash || [], tomb:data.tomb || [] }));
+      applyMerged(mergeStates(state, { codes:data.codes || [], clinics:data.clinics || [], entries:data.entries || [], cash:data.cash || [], pay:data.pay || [], tomb:data.tomb || [] }));
       persist(); renderAll(); toast('備份已合併匯入');
     }catch(err){ toast('匯入失敗，請確認檔案格式'); }
     e.target.value = '';
@@ -2236,7 +2399,7 @@
     loadCloud();
     consumeSyncHash();
     state.codes = lsGet('codes', []); state.clinics = lsGet('clinics', []);
-    state.entries = lsGet('entries', []); state.cash = lsGet('cash', []); state.tomb = lsGet('tomb', []);
+    state.entries = lsGet('entries', []); state.cash = lsGet('cash', []); state.tomb = lsGet('tomb', []); state.pay = lsGet('pay', []);
     normalizeState();
     let msg = '';
     if(lsGet('codeVer', null) !== CODES_VERSION || !state.codes.length){
