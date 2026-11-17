@@ -521,6 +521,12 @@
 .paytbl td:first-child,.paytbl th:first-child{white-space:nowrap; width:1%; padding-right:10px;}
 .pay-card .actions{display:flex; justify-content:flex-end; gap:8px;}
 
+/* ================= v3.6 診次比較：健保／自費檢視 ================= */
+.shbar .split{display:flex; height:100%; border-radius:6px; overflow:hidden;}
+.shbar .split span{display:block; height:100%; min-width:0;}
+.shlegend{display:flex; gap:14px; font-size:12px; color:var(--ink-soft); font-weight:600; margin:0 0 6px 4px;}
+.shlegend i{display:inline-block; width:10px; height:10px; border-radius:3px; margin-right:5px; vertical-align:-1px;}
+
 </style>
 </head>
 <body>
@@ -598,6 +604,7 @@
 
         <div class="card span2" id="shiftCard">
           <h2>診次業績比較</h2>
+          <div class="chips" id="shiftMetric" style="margin:2px 0 10px;"></div>
           <div class="hint" id="shiftHint" style="margin:-4px 0 10px;"></div>
           <div id="shiftBody"></div>
         </div>
@@ -1963,37 +1970,60 @@
   }
   const inRange = (d, r) => d >= r.from && d <= r.to;   // 日期是 YYYY-MM-DD 字串，直接比較即可
 
+  let shiftMetric = lsGet('shiftMetric', 'all');   // all=健保＋自費合計 / ins=只看健保 / cash=只看自費 / both=並列
+  if(!['all','ins','cash','both'].includes(shiftMetric)) shiftMetric = 'all';
   function renderShiftAnalysis(ins, cash){
     const keys = ['m','a','n','x'], d = {};
-    keys.forEach(k => d[k] = { inc:0, pts:0, n:0, days:new Set(), by:{} });
+    keys.forEach(k => d[k] = { iInc:0, cInc:0, pts:0, iN:0, cN:0, iDays:new Set(), cDays:new Set(), by:{} });
     const addBy = (k, date, v) => { d[k].by[date] = (d[k].by[date] || 0) + v; };
-    ins.forEach(e => { const k = SHIFTS[e.shift] ? e.shift : 'x'; d[k].inc += incomeOfIns(e); d[k].pts += e.points * e.qty; d[k].n++; d[k].days.add(e.date); addBy(k, e.date, incomeOfIns(e)); });
-    cash.forEach(e => { const k = SHIFTS[e.shift] ? e.shift : 'x'; d[k].inc += incomeOfCash(e); d[k].n++; d[k].days.add(e.date); addBy(k, e.date, incomeOfCash(e)); });
-    const total = keys.reduce((s, k) => s + d[k].inc, 0);
+    ins.forEach(e => { const k = SHIFTS[e.shift] ? e.shift : 'x', v = incomeOfIns(e); d[k].iInc += v; d[k].pts += e.points * e.qty; d[k].iN++; d[k].iDays.add(e.date); addBy(k, e.date, v); });
+    cash.forEach(e => { const k = SHIFTS[e.shift] ? e.shift : 'x', v = incomeOfCash(e); d[k].cInc += v; d[k].cN++; d[k].cDays.add(e.date); addBy(k, e.date, v); });
+    // 依檢視模式算出每一診的數字
+    const view = k => {
+      const x = d[k], m = shiftMetric;
+      const inc = m === 'ins' ? x.iInc : m === 'cash' ? x.cInc : x.iInc + x.cInc;
+      const n = m === 'ins' ? x.iN : m === 'cash' ? x.cN : x.iN + x.cN;
+      const days = m === 'ins' ? x.iDays : m === 'cash' ? x.cDays : new Set([...x.iDays, ...x.cDays]);
+      return { inc, n, days };
+    };
     // 篩選晶片（未分診只在有資料時顯示）
     const chips = [['all', '全部'], ['m', '早診'], ['a', '午診'], ['n', '晚診']];
-    if(d.x.n) chips.push(['x', '未分診']);
+    if(d.x.iN + d.x.cN) chips.push(['x', '未分診']);
     if(!chips.some(c => c[0] === currentShiftFilter)) currentShiftFilter = 'all';
     $('#shiftChips').innerHTML = chips.map(([k, l]) => `<button type="button" class="chip ${k === currentShiftFilter ? 'active' : ''}" data-shift="${k}">${l}</button>`).join('');
-    const shown = keys.filter(k => d[k].n);
-    $('#shiftCard').style.display = shown.length ? '' : 'none';
-    if(!shown.length) return;
+    const anyData = keys.some(k => d[k].iN + d[k].cN);
+    $('#shiftCard').style.display = anyData ? '' : 'none';
+    if(!anyData) return;
+    const metrics = [['all', '合計'], ['ins', '健保'], ['cash', '自費'], ['both', '並列']];
+    $('#shiftMetric').innerHTML = metrics.map(([k, l]) => `<button type="button" class="chip ${k === shiftMetric ? 'active' : ''}" data-metric="${k}">${l}</button>`).join('');
+    const hints = { all:'健保＋自費合計', ins:'只看健保申報', cash:'只看自費（一般＋高自費）', both:'健保與自費並列' };
+    $('#shiftHint').textContent = `${hints[shiftMetric]}；依上方選的診所與期間統計，點一列可只看那一診。平均＝總額 ÷ 有紀錄的天數。`;
+    const shown = keys.filter(k => view(k).n);
+    if(!shown.length){ $('#shiftBody').innerHTML = `<div class="empty-state">這段期間沒有${shiftMetric === 'cash' ? '自費' : '健保'}紀錄</div>`; return; }
+    const total = shown.reduce((s, k) => s + view(k).inc, 0);
     const withDays = shown.filter(k => k !== 'x');
-    const bestTotal = withDays.length > 1 ? withDays.reduce((a, k) => d[k].inc > d[a].inc ? k : a, withDays[0]) : null;
-    const bestAvg = withDays.length > 1 ? withDays.reduce((a, k) => d[k].inc / d[k].days.size > d[a].inc / d[a].days.size ? k : a, withDays[0]) : null;
-    $('#shiftHint').textContent = '依上方選的診所與期間統計；點一列可只看那一診。平均＝總額 ÷ 有紀錄的天數。';
-    $('#shiftBody').innerHTML = shown.map(k => {
-      const x = d[k], avg = x.inc / x.days.size, pct = total ? Math.round(x.inc / total * 100) : 0;
-      const gClinic = currentClinicFilter !== 'all' ? clinicById(currentClinicFilter) : null, gg = k !== 'x' ? goalOf(gClinic, k) : 0;
-      const hitTxt = gg ? ` ・ 達標 ${Object.values(x.by).filter(v => v >= gg).length}/${x.days.size} 天（目標 ${fmt(gg)}）` : '';
+    const bestTotal = withDays.length > 1 ? withDays.reduce((a, k) => view(k).inc > view(a).inc ? k : a, withDays[0]) : null;
+    const avgOf = k => view(k).inc / view(k).days.size;
+    const bestAvg = withDays.length > 1 ? withDays.reduce((a, k) => avgOf(k) > avgOf(a) ? k : a, withDays[0]) : null;
+    const legend = shiftMetric === 'both' ? '<div class="shlegend"><span><i style="background:var(--teal)"></i>健保</span><span><i style="background:var(--amber)"></i>自費</span></div>' : '';
+    $('#shiftBody').innerHTML = legend + shown.map(k => {
+      const x = d[k], v = view(k), avg = v.inc / v.days.size, pct = total ? Math.round(v.inc / total * 100) : 0;
+      const gClinic = currentClinicFilter !== 'all' ? clinicById(currentClinicFilter) : null, gg = (k !== 'x' && (shiftMetric === 'all' || shiftMetric === 'both')) ? goalOf(gClinic, k) : 0;
+      const hitTxt = gg ? ` ・ 達標 ${Object.values(x.by).filter(t => t >= gg).length}/${v.days.size} 天（目標 ${fmt(gg)}）` : '';
       const tags = (k === bestTotal ? '<span class="best">總額最高</span>' : '') + (k === bestAvg ? '<span class="best b2">平均最高</span>' : '');
+      const split = shiftMetric === 'both' ? `健保 ${fmt(x.iInc)} ・ 自費 ${fmt(x.cInc)} ・ ` : '';
+      const bar = shiftMetric === 'both'
+        ? `<div class="shbar"><div class="split" style="width:${pct}%;"><span style="flex:${x.iInc};background:var(--teal);"></span><span style="flex:${x.cInc};background:var(--amber);"></span></div></div>`
+        : `<div class="shbar"><div style="width:${pct}%; background:var(--${shiftMetric === 'cash' ? 'amber' : shiftMetric === 'ins' ? 'teal' : SHIFT_COLOR[k]});"></div></div>`;
+      const pts = shiftMetric === 'cash' ? '' : `${x.pts.toLocaleString()} 點 ・ `;
       return `<div class="shift-row ${k === currentShiftFilter ? 'on' : ''}" data-shift="${k}" role="button" tabindex="0">
-        <div class="flex-between"><span><span class="shtag sh-${k}">${k === 'x' ? '未分診' : SHIFTS[k]}</span>${tags}</span><b class="mono">${fmt(x.inc)}</b></div>
-        <div class="shbar"><div style="width:${pct}%; background:var(--${SHIFT_COLOR[k]});"></div></div>
-        <div class="hint">占 ${pct}% ・ 平均每天 ${fmt(avg)}（${x.days.size} 天）・ ${x.pts.toLocaleString()} 點 ・ ${x.n} 筆${hitTxt}</div>
+        <div class="flex-between"><span><span class="shtag sh-${k}">${k === 'x' ? '未分診' : SHIFTS[k]}</span>${tags}</span><b class="mono">${fmt(v.inc)}</b></div>
+        ${bar}
+        <div class="hint">${split}占 ${pct}% ・ 平均每天 ${fmt(avg)}（${v.days.size} 天）・ ${pts}${v.n} 筆${hitTxt}</div>
       </div>`;
     }).join('');
   }
+  $('#shiftMetric').addEventListener('click', e => { const b = e.target.closest('[data-metric]'); if(b){ shiftMetric = b.dataset.metric; lsSet('shiftMetric', shiftMetric); renderDash(); } });
   function setShiftFilter(k){ currentShiftFilter = currentShiftFilter === k && k !== 'all' ? 'all' : k; renderDash(); }
   $('#shiftChips').addEventListener('click', e => { const b = e.target.closest('[data-shift]'); if(b) setShiftFilter(b.dataset.shift); });
   $('#shiftBody').addEventListener('click', e => { const r = e.target.closest('[data-shift]'); if(r) setShiftFilter(r.dataset.shift); });
