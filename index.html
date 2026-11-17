@@ -1970,8 +1970,8 @@
   }
   const inRange = (d, r) => d >= r.from && d <= r.to;   // 日期是 YYYY-MM-DD 字串，直接比較即可
 
-  let shiftMetric = lsGet('shiftMetric', 'all');   // all=健保＋自費合計 / ins=只看健保 / cash=只看自費 / both=並列
-  if(!['all','ins','cash','both'].includes(shiftMetric)) shiftMetric = 'all';
+  let shiftMetric = lsGet('shiftMetric', 'all');   // all=健保＋自費合計（含兩色分段） / ins=只看健保 / cash=只看自費
+  if(!['all','ins','cash'].includes(shiftMetric)) shiftMetric = 'all';
   function renderShiftAnalysis(ins, cash){
     const keys = ['m','a','n','x'], d = {};
     keys.forEach(k => d[k] = { iInc:0, cInc:0, pts:0, iN:0, cN:0, iDays:new Set(), cDays:new Set(), by:{} });
@@ -1994,9 +1994,9 @@
     const anyData = keys.some(k => d[k].iN + d[k].cN);
     $('#shiftCard').style.display = anyData ? '' : 'none';
     if(!anyData) return;
-    const metrics = [['all', '合計'], ['ins', '健保'], ['cash', '自費'], ['both', '並列']];
+    const metrics = [['all', '合計'], ['ins', '健保'], ['cash', '自費']];
     $('#shiftMetric').innerHTML = metrics.map(([k, l]) => `<button type="button" class="chip ${k === shiftMetric ? 'active' : ''}" data-metric="${k}">${l}</button>`).join('');
-    const hints = { all:'健保＋自費合計', ins:'只看健保申報', cash:'只看自費（一般＋高自費）', both:'健保與自費並列' };
+    const hints = { all:'健保＋自費合計（長條分色顯示兩者比例）', ins:'只看健保申報', cash:'只看自費（一般＋高自費）' };
     $('#shiftHint').textContent = `${hints[shiftMetric]}；依上方選的診所與期間統計，點一列可只看那一診。平均＝總額 ÷ 有紀錄的天數。`;
     const shown = keys.filter(k => view(k).n);
     if(!shown.length){ $('#shiftBody').innerHTML = `<div class="empty-state">這段期間沒有${shiftMetric === 'cash' ? '自費' : '健保'}紀錄</div>`; return; }
@@ -2005,14 +2005,14 @@
     const bestTotal = withDays.length > 1 ? withDays.reduce((a, k) => view(k).inc > view(a).inc ? k : a, withDays[0]) : null;
     const avgOf = k => view(k).inc / view(k).days.size;
     const bestAvg = withDays.length > 1 ? withDays.reduce((a, k) => avgOf(k) > avgOf(a) ? k : a, withDays[0]) : null;
-    const legend = shiftMetric === 'both' ? '<div class="shlegend"><span><i style="background:var(--teal)"></i>健保</span><span><i style="background:var(--amber)"></i>自費</span></div>' : '';
+    const legend = shiftMetric === 'all' ? '<div class="shlegend"><span><i style="background:var(--teal)"></i>健保</span><span><i style="background:var(--amber)"></i>自費</span></div>' : '';
     $('#shiftBody').innerHTML = legend + shown.map(k => {
       const x = d[k], v = view(k), avg = v.inc / v.days.size, pct = total ? Math.round(v.inc / total * 100) : 0;
-      const gClinic = currentClinicFilter !== 'all' ? clinicById(currentClinicFilter) : null, gg = (k !== 'x' && (shiftMetric === 'all' || shiftMetric === 'both')) ? goalOf(gClinic, k) : 0;
+      const gClinic = currentClinicFilter !== 'all' ? clinicById(currentClinicFilter) : null, gg = (k !== 'x' && shiftMetric === 'all') ? goalOf(gClinic, k) : 0;
       const hitTxt = gg ? ` ・ 達標 ${Object.values(x.by).filter(t => t >= gg).length}/${v.days.size} 天（目標 ${fmt(gg)}）` : '';
       const tags = (k === bestTotal ? '<span class="best">總額最高</span>' : '') + (k === bestAvg ? '<span class="best b2">平均最高</span>' : '');
-      const split = shiftMetric === 'both' ? `健保 ${fmt(x.iInc)} ・ 自費 ${fmt(x.cInc)} ・ ` : '';
-      const bar = shiftMetric === 'both'
+      const split = shiftMetric === 'all' ? `健保 ${fmt(x.iInc)} ・ 自費 ${fmt(x.cInc)} ・ ` : '';
+      const bar = shiftMetric === 'all'
         ? `<div class="shbar"><div class="split" style="width:${pct}%;"><span style="flex:${x.iInc};background:var(--teal);"></span><span style="flex:${x.cInc};background:var(--amber);"></span></div></div>`
         : `<div class="shbar"><div style="width:${pct}%; background:var(--${shiftMetric === 'cash' ? 'amber' : shiftMetric === 'ins' ? 'teal' : SHIFT_COLOR[k]});"></div></div>`;
       const pts = shiftMetric === 'cash' ? '' : `${x.pts.toLocaleString()} 點 ・ `;
