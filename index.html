@@ -545,6 +545,20 @@
 #catRange::-webkit-scrollbar{display:none;}
 #catRange .chip{flex-shrink:0; white-space:nowrap;}
 
+/* ================= v3.8 紀錄明細分頁 ================= */
+.pagesize{display:flex; align-items:center; gap:8px; margin:2px 0 6px; font-size:13px; color:var(--ink-soft); font-weight:600;}
+.pagesize select{width:auto; min-height:38px; padding:4px 10px; font-size:15px;}
+.pager{display:flex; align-items:center; justify-content:space-between; gap:8px; margin-top:12px;}
+.pager:empty{display:none;}
+.pager .btn{min-width:96px;}
+.pager .btn:disabled{opacity:.4; cursor:default;}
+.pginfo{font-size:14px; color:var(--ink-soft); font-weight:600;}
+.pginfo b{color:var(--ink); font-family:'IBM Plex Mono',monospace;}
+.dash-right .card{scroll-margin-top:96px;}
+.dash-split{grid-template-columns:minmax(0,1fr);}
+.dash-split > .card,.dash-left > .card,.dash-right > .card{min-width:0; max-width:100%;}
+@media (min-width:768px){ .dash-split{grid-template-columns:repeat(auto-fit,minmax(min(280px,100%),1fr));} }
+
 </style>
 </head>
 <body>
@@ -657,7 +671,12 @@
             <h2>紀錄明細</h2>
             <span class="hint" id="entryCount"></span>
           </div>
+          <div class="pagesize"><label for="pageSize">每頁顯示</label>
+            <select id="pageSize" aria-label="每頁顯示筆數">
+              <option value="5">5 筆</option><option value="10">10 筆</option><option value="20">20 筆</option><option value="50">50 筆</option><option value="0">全部</option>
+            </select></div>
           <div id="entryList"></div>
+          <div class="pager" id="pager"></div>
         </div>
       </div>
     </div>
@@ -2168,11 +2187,31 @@
     renderCatPie(active);
 
     const all = [...ins.map(e => ({ ...e, _kind:'ins' })), ...cash.map(e => ({ ...e, _kind:'cash' }))].sort(sortRecent);
-    $('#entryCount').textContent = `共 ${all.length} 筆`;
     const showClinic = currentClinicFilter === 'all' && state.clinics.length > 1;
-    $('#entryList').innerHTML = all.length ? all.map(e => entryRowHTML(e, showClinic)).join('')
+    // 分頁：條件（期間／診所／診次／每頁筆數）一變就回到第 1 頁
+    const sig = [currentRange, $('#rangeFrom').value, $('#rangeTo').value, currentClinicFilter, currentShiftFilter, pageSize].join('|');
+    if(sig !== pageSig){ pageSig = sig; entryPage = 1; }
+    const pages = pageSize ? Math.max(1, Math.ceil(all.length / pageSize)) : 1;
+    entryPage = Math.min(Math.max(1, entryPage), pages);
+    const startIdx = pageSize ? (entryPage - 1) * pageSize : 0;
+    const slice = pageSize ? all.slice(startIdx, startIdx + pageSize) : all;
+    $('#entryCount').textContent = pageSize && all.length > pageSize ? `共 ${all.length} 筆・顯示第 ${startIdx + 1}–${startIdx + slice.length} 筆` : `共 ${all.length} 筆`;
+    $('#pageSize').value = String(pageSize);
+    $('#entryList').innerHTML = all.length ? slice.map(e => entryRowHTML(e, showClinic)).join('')
       : `<div class="empty-state">${state.clinics.length ? '這段期間還沒有紀錄，到「新增紀錄」開始記帳。' : '先到「診所」頁新增你服務的診所，再開始記帳。'}</div>`;
+    $('#pager').innerHTML = pages > 1 ? `<button type="button" class="btn btn-ghost btn-sm" data-pg="prev" ${entryPage <= 1 ? 'disabled' : ''}>‹ 上一頁</button>
+      <span class="pginfo">第 <b>${entryPage}</b> / ${pages} 頁</span>
+      <button type="button" class="btn btn-ghost btn-sm" data-pg="next" ${entryPage >= pages ? 'disabled' : ''}>下一頁 ›</button>` : '';
   }
+  let pageSize = parseInt(lsGet('pageSize', 10), 10), entryPage = 1, pageSig = '';
+  if(![0, 5, 10, 20, 50].includes(pageSize)) pageSize = 10;
+  $('#pageSize').addEventListener('change', () => { pageSize = parseInt($('#pageSize').value, 10); lsSet('pageSize', pageSize); entryPage = 1; renderDash(); });
+  $('#pager').addEventListener('click', e => {
+    const b = e.target.closest('[data-pg]'); if(!b || b.disabled) return;
+    entryPage += b.dataset.pg === 'next' ? 1 : -1;
+    renderDash();
+    const card = $('#entryList').closest('.card'); if(card && card.scrollIntoView) card.scrollIntoView({ block:'start', behavior:'smooth' });
+  });
 
   /* =====================================================================
      代碼庫
