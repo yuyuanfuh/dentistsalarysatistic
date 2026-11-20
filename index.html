@@ -527,6 +527,21 @@
 .shlegend{display:flex; gap:14px; font-size:12px; color:var(--ink-soft); font-weight:600; margin:0 0 6px 4px;}
 .shlegend i{display:inline-block; width:10px; height:10px; border-radius:3px; margin-right:5px; vertical-align:-1px;}
 
+/* ================= v3.7 分類佔比圓餅圖 ================= */
+.pie-wrap{display:flex; align-items:center; gap:18px; flex-wrap:wrap; justify-content:center;}
+.pie{width:200px; height:200px; flex-shrink:0;}
+.pie-pct{font-size:9px; font-weight:700; fill:#fff; font-family:'Inter',system-ui,sans-serif;}
+.pie-c1{font-size:13px; font-weight:700; fill:var(--ink); font-family:'IBM Plex Mono',monospace;}
+.pie-c2{font-size:7px; fill:var(--ink-soft); font-weight:600;}
+.pie-legend{flex:1; min-width:210px; display:grid; gap:8px;}
+.pie-row{display:grid; grid-template-columns:12px auto 1fr; grid-template-areas:"d n p" ". v v"; column-gap:8px; align-items:center;}
+.pie-row.zero{opacity:.45;}
+.pie-dot{grid-area:d; width:12px; height:12px; border-radius:4px;}
+.pie-name{grid-area:n; font-weight:700; font-size:14.5px;}
+.pie-p{grid-area:p; text-align:right; font-size:17px;}
+.pie-v{grid-area:v; font-size:11.5px; color:var(--ink-soft);}
+@media (min-width:1024px){ .pie{width:220px; height:220px;} }
+
 </style>
 </head>
 <body>
@@ -569,6 +584,8 @@
           <h3 class="sub-h">期間</h3>
           <div class="chips" id="rangeChips">
             <button type="button" class="chip" data-range="today">今天</button>
+            <button type="button" class="chip" data-range="week">本週</button>
+            <button type="button" class="chip" data-range="lastweek">上週</button>
             <button type="button" class="chip active" data-range="month">本月</button>
             <button type="button" class="chip" data-range="lastmonth">上月</button>
             <button type="button" class="chip" data-range="year">今年</button>
@@ -618,7 +635,9 @@
             </table>
           </div>
           <div class="card">
-            <h2>分類佔比（健保點值）</h2>
+            <h2>分類佔比</h2>
+            <div class="chips" id="catMetric" style="margin:2px 0 6px;"></div>
+            <div class="hint" id="catCtx" style="margin-bottom:10px;"></div>
             <div id="catBreakdown"></div>
           </div>
         </div>
@@ -1962,6 +1981,10 @@
     const n = new Date(), y = n.getFullYear(), m = n.getMonth();
     let from, to;
     if(currentRange === 'today'){ from = to = todayStr(); }
+    else if(currentRange === 'week' || currentRange === 'lastweek'){
+      const dow = (n.getDay() + 6) % 7, off = currentRange === 'lastweek' ? 7 : 0;   // 週一為一週的開始
+      from = ymd(new Date(y, m, n.getDate() - dow - off)); to = ymd(new Date(y, m, n.getDate() - dow - off + 6));
+    }
     else if(currentRange === 'month'){ from = ymd(new Date(y, m, 1)); to = ymd(new Date(y, m + 1, 0)); }
     else if(currentRange === 'lastmonth'){ from = ymd(new Date(y, m - 1, 1)); to = ymd(new Date(y, m, 0)); }
     else if(currentRange === 'year'){ from = `${y}-01-01`; to = `${y}-12-31`; }
@@ -2028,6 +2051,46 @@
   $('#shiftChips').addEventListener('click', e => { const b = e.target.closest('[data-shift]'); if(b) setShiftFilter(b.dataset.shift); });
   $('#shiftBody').addEventListener('click', e => { const r = e.target.closest('[data-shift]'); if(r) setShiftFilter(r.dataset.shift); });
 
+  /* 分類佔比：圓餅圖 + 百分比 */
+  let catMetric = lsGet('catMetric', 'pts');
+  if(!['pts','inc'].includes(catMetric)) catMetric = 'pts';
+  const RANGE_NAME = { today:'今天', week:'本週', lastweek:'上週', month:'本月', lastmonth:'上月', year:'今年', custom:'自訂區間' };
+  function pctList(vals){   // 最大餘數法，讓百分比加起來剛好 100
+    const total = vals.reduce((s, v) => s + v, 0);
+    if(!total) return vals.map(() => 0);
+    const raw = vals.map(v => v / total * 100), fl = raw.map(Math.floor);
+    let left = 100 - fl.reduce((s, v) => s + v, 0);
+    raw.map((v, i) => [v - fl[i], i]).sort((a, b) => b[0] - a[0]).forEach(([, i]) => { if(left > 0 && raw[i] > 0){ fl[i]++; left--; } });
+    return fl;
+  }
+  function renderCatPie(catPts, catInc, r, activeClinic){
+    const keys = Object.keys(CATS), isPts = catMetric === 'pts';
+    $('#catMetric').innerHTML = [['pts', '依點數'], ['inc', '依收入']].map(([k, l]) => `<button type="button" class="chip ${k === catMetric ? 'active' : ''}" data-cm="${k}">${l}</button>`).join('');
+    const shLab = currentShiftFilter === 'all' ? '' : '・' + (currentShiftFilter === 'x' ? '未分診' : SHIFTS[currentShiftFilter]);
+    $('#catCtx').textContent = `${RANGE_NAME[currentRange] || ''}（${r.from === r.to ? r.from : r.from.slice(5) + '～' + r.to.slice(5)}）・${activeClinic ? activeClinic.name : '全部診所'}${shLab}・僅健保申報`;
+    const vals = keys.map(k => isPts ? catPts[k] : catInc[k]), total = vals.reduce((s, v) => s + v, 0);
+    if(!total){ $('#catBreakdown').innerHTML = '<div class="empty-state">這段期間沒有健保申報紀錄</div>'; return; }
+    const pcts = pctList(vals), C = 2 * Math.PI * 46;
+    let cum = 0, segs = '', labels = '';
+    keys.forEach((k, i) => {
+      const f = vals[i] / total; if(!f) return;
+      segs += `<circle cx="60" cy="60" r="46" fill="none" stroke-width="22" style="stroke:var(--${CAT_COLOR[k]});" stroke-dasharray="${(f * C).toFixed(2)} ${(C - f * C).toFixed(2)}" stroke-dashoffset="${(-cum * C).toFixed(2)}" transform="rotate(-90 60 60)"/>`;
+      if(pcts[i] >= 6){
+        const a = (cum + f / 2) * 2 * Math.PI - Math.PI / 2;
+        labels += `<text x="${(60 + 46 * Math.cos(a)).toFixed(1)}" y="${(60 + 46 * Math.sin(a)).toFixed(1)}" text-anchor="middle" dominant-baseline="central" class="pie-pct">${pcts[i]}%</text>`;
+      }
+      cum += f;
+    });
+    const center = isPts ? total.toLocaleString() : fmt(total);
+    const svg = `<svg viewBox="0 0 120 120" class="pie" role="img" aria-label="分類佔比圓餅圖">${segs}${labels}<text x="60" y="56" text-anchor="middle" class="pie-c1">${center}</text><text x="60" y="71" text-anchor="middle" class="pie-c2">${isPts ? '點' : '預估收入'}</text></svg>`;
+    const legend = keys.map((k, i) => `<div class="pie-row ${vals[i] ? '' : 'zero'}">
+        <span class="pie-dot" style="background:var(--${CAT_COLOR[k]});"></span><span class="pie-name">${CATS[k].label}</span>
+        <b class="pie-p">${pcts[i]}%</b>
+        <span class="pie-v mono">${catPts[k].toLocaleString()} 點・${fmt(catInc[k])}</span></div>`).join('');
+    $('#catBreakdown').innerHTML = `<div class="pie-wrap">${svg}<div class="pie-legend">${legend}</div></div>`;
+  }
+  $('#catMetric').addEventListener('click', e => { const b = e.target.closest('[data-cm]'); if(b){ catMetric = b.dataset.cm; lsSet('catMetric', catMetric); renderDash(); } });
+
   function renderDash(){
     renderClinicChips();
     const r = getRange();
@@ -2074,15 +2137,7 @@
       }).join('');
     } else bk.style.display = 'none';
 
-    const maxPts = Math.max(1, ...Object.values(catPts));
-    $('#catBreakdown').innerHTML = Object.keys(CATS).map(k => `<div style="margin-bottom:10px;">
-        <div class="flex-between" style="margin-bottom:4px;">
-          <span class="badge ${CATS[k].cls}">${CATS[k].label}</span>
-          <span class="mono hint">${catPts[k].toLocaleString()} 點 · ${fmt(catInc[k])}</span>
-        </div>
-        <div style="height:7px; background:var(--gray-soft); border-radius:6px; overflow:hidden;">
-          <div style="height:100%; width:${catPts[k] ? Math.round(catPts[k] / maxPts * 100) : 0}%; background:var(--${CAT_COLOR[k]});"></div>
-        </div></div>`).join('');
+    renderCatPie(catPts, catInc, r, active);
 
     const all = [...ins.map(e => ({ ...e, _kind:'ins' })), ...cash.map(e => ({ ...e, _kind:'cash' }))].sort(sortRecent);
     $('#entryCount').textContent = `共 ${all.length} 筆`;
