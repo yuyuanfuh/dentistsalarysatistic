@@ -558,6 +558,17 @@
 .dash-split{grid-template-columns:minmax(0,1fr);}
 .dash-split > .card,.dash-left > .card,.dash-right > .card{min-width:0; max-width:100%;}
 @media (min-width:768px){ .dash-split{grid-template-columns:repeat(auto-fit,minmax(min(280px,100%),1fr));} }
+#catClinic{flex-wrap:nowrap; overflow-x:auto; scrollbar-width:none;}
+#catClinic::-webkit-scrollbar{display:none;}
+#catClinic .chip{flex-shrink:0; white-space:nowrap;}
+.pie-grid{display:grid; gap:14px; grid-template-columns:minmax(0,1fr);}
+.pie-mini{border:1px solid var(--line); border-radius:14px; padding:12px;}
+.pie-title{display:flex; align-items:center; gap:8px; font-weight:700; margin-bottom:6px;}
+.pie-mini .pie{width:150px; height:150px;}
+.pie-mini .pie-legend{min-width:150px; gap:6px;}
+.pie-mini .pie-name{font-size:13.5px;}
+.pie-mini .pie-p{font-size:15px;}
+@media (min-width:1024px){ .pie-grid{grid-template-columns:repeat(auto-fit,minmax(340px,1fr));} }
 
 </style>
 </head>
@@ -653,6 +664,7 @@
           </div>
           <div class="card">
             <h2>分類佔比</h2>
+            <div class="chips" id="catClinic" style="margin:2px 0 6px;"></div>
             <div class="chips" id="catRange" style="margin:2px 0 6px;"></div>
             <div class="row" id="catCustom" style="display:none; margin-bottom:6px;">
               <div class="field"><label for="catFrom">起始日期</label><input type="date" id="catFrom"></div>
@@ -2093,28 +2105,9 @@
   }
   let catRange = lsGet('catRange', 'follow');   // follow=跟隨上方期間，或 today/week/lastweek/month/lastmonth/year/custom
   if(catRange !== 'follow' && !RANGE_NAME[catRange]) catRange = 'follow';
-  function renderCatPie(activeClinic){
-    const keys = Object.keys(CATS), isPts = catMetric === 'pts';
-    const rangeChips = [['follow', '同上方'], ['today', '本日'], ['week', '本週'], ['lastweek', '上週'], ['month', '本月'], ['lastmonth', '上月'], ['year', '今年'], ['custom', '自訂']];
-    $('#catRange').innerHTML = rangeChips.map(([k, l]) => `<button type="button" class="chip ${k === catRange ? 'active' : ''}" data-cr="${k}">${l}</button>`).join('');
-    $('#catCustom').style.display = catRange === 'custom' ? '' : 'none';
-    const kind = catRange === 'follow' ? currentRange : catRange;
-    const r = catRange === 'follow' ? getRange() : rangeOf(catRange, $('#catFrom').value, $('#catTo').value);
-    const catPts = {}, catInc = {};
-    keys.forEach(k => { catPts[k] = 0; catInc[k] = 0; });
-    state.entries.forEach(e => {
-      if(!inRange(e.date, r)) return;
-      if(currentClinicFilter !== 'all' && e.clinicId !== currentClinicFilter) return;
-      if(currentShiftFilter !== 'all' && (e.shift || '') !== (currentShiftFilter === 'x' ? '' : currentShiftFilter)) return;
-      const k = CATS[e.cat] ? e.cat : 'other';
-      catPts[k] += e.points * e.qty; catInc[k] += incomeOfIns(e);
-    });
-    $('#catMetric').innerHTML = [['pts', '依點數'], ['inc', '依收入']].map(([k, l]) => `<button type="button" class="chip ${k === catMetric ? 'active' : ''}" data-cm="${k}">${l}</button>`).join('');
-    const shLab = currentShiftFilter === 'all' ? '' : '・' + (currentShiftFilter === 'x' ? '未分診' : SHIFTS[currentShiftFilter]);
-    $('#catCtx').textContent = `${RANGE_NAME[kind] || ''}（${r.from === r.to ? r.from : r.from.slice(5) + '～' + r.to.slice(5)}）・${activeClinic ? activeClinic.name : '全部診所'}${shLab}・僅健保申報`;
-    const vals = keys.map(k => isPts ? catPts[k] : catInc[k]), total = vals.reduce((s, v) => s + v, 0);
-    if(!total){ $('#catBreakdown').innerHTML = '<div class="empty-state">這段期間沒有健保申報紀錄</div>'; return; }
-    const pcts = pctList(vals), C = 2 * Math.PI * 46;
+  let catClinic = lsGet('catClinic', 'follow');  // follow=跟隨上方 / all=全部診所 / split=各診所並列 / 診所 id
+  function pieChart(vals, isPts, cls){
+    const total = vals.reduce((s, v) => s + v, 0), pcts = pctList(vals), keys = Object.keys(CATS), C = 2 * Math.PI * 46;
     let cum = 0, segs = '', labels = '';
     keys.forEach((k, i) => {
       const f = vals[i] / total; if(!f) return;
@@ -2126,13 +2119,64 @@
       cum += f;
     });
     const center = isPts ? total.toLocaleString() : fmt(total);
-    const svg = `<svg viewBox="0 0 120 120" class="pie" role="img" aria-label="分類佔比圓餅圖">${segs}${labels}<text x="60" y="56" text-anchor="middle" class="pie-c1">${center}</text><text x="60" y="71" text-anchor="middle" class="pie-c2">${isPts ? '點' : '預估收入'}</text></svg>`;
-    const legend = keys.map((k, i) => `<div class="pie-row ${vals[i] ? '' : 'zero'}">
+    return { pcts, svg: `<svg viewBox="0 0 120 120" class="pie ${cls || ''}" role="img" aria-label="分類佔比圓餅圖">${segs}${labels}<text x="60" y="56" text-anchor="middle" class="pie-c1">${center}</text><text x="60" y="71" text-anchor="middle" class="pie-c2">${isPts ? '點' : '預估收入'}</text></svg>` };
+  }
+  function pieLegend(pcts, vals, catPts, catInc){
+    return Object.keys(CATS).map((k, i) => `<div class="pie-row ${vals[i] ? '' : 'zero'}">
         <span class="pie-dot" style="background:var(--${CAT_COLOR[k]});"></span><span class="pie-name">${CATS[k].label}</span>
         <b class="pie-p">${pcts[i]}%</b>
         <span class="pie-v mono">${catPts[k].toLocaleString()} 點・${fmt(catInc[k])}</span></div>`).join('');
-    $('#catBreakdown').innerHTML = `<div class="pie-wrap">${svg}<div class="pie-legend">${legend}</div></div>`;
   }
+  function renderCatPie(){
+    const keys = Object.keys(CATS), isPts = catMetric === 'pts';
+    // 診所選項
+    if(!['follow', 'all', 'split'].includes(catClinic) && !clinicById(catClinic)) catClinic = 'follow';
+    const cOpts = [['follow', '同上方', null], ['all', '全部診所', null], ...state.clinics.map(c => [c.id, c.name, c.color])];
+    if(state.clinics.length > 1) cOpts.push(['split', '各診所並列', null]);
+    if(catClinic === 'split' && state.clinics.length < 2) catClinic = 'follow';
+    $('#catClinic').innerHTML = cOpts.map(([k, l, col]) => `<button type="button" class="chip ${k === catClinic ? 'active' : ''}" data-cc="${esc(k)}">${col ? `<span class="dot" style="background:${esc(col)};"></span>` : ''}${esc(l)}</button>`).join('');
+    // 期間選項
+    const rangeChips = [['follow', '同上方'], ['today', '本日'], ['week', '本週'], ['lastweek', '上週'], ['month', '本月'], ['lastmonth', '上月'], ['year', '今年'], ['custom', '自訂']];
+    $('#catRange').innerHTML = rangeChips.map(([k, l]) => `<button type="button" class="chip ${k === catRange ? 'active' : ''}" data-cr="${k}">${l}</button>`).join('');
+    $('#catCustom').style.display = catRange === 'custom' ? '' : 'none';
+    $('#catMetric').innerHTML = [['pts', '依點數'], ['inc', '依收入']].map(([k, l]) => `<button type="button" class="chip ${k === catMetric ? 'active' : ''}" data-cm="${k}">${l}</button>`).join('');
+    const kind = catRange === 'follow' ? currentRange : catRange;
+    const r = catRange === 'follow' ? getRange() : rangeOf(catRange, $('#catFrom').value, $('#catTo').value);
+    const agg = clinicId => {   // clinicId=null 代表全部診所
+      const p = {}, n = {}; keys.forEach(k => { p[k] = 0; n[k] = 0; });
+      state.entries.forEach(e => {
+        if(!inRange(e.date, r)) return;
+        if(clinicId && e.clinicId !== clinicId) return;
+        if(currentShiftFilter !== 'all' && (e.shift || '') !== (currentShiftFilter === 'x' ? '' : currentShiftFilter)) return;
+        const k = CATS[e.cat] ? e.cat : 'other';
+        p[k] += e.points * e.qty; n[k] += incomeOfIns(e);
+      });
+      return { pts:p, inc:n };
+    };
+    const shLab = currentShiftFilter === 'all' ? '' : '・' + (currentShiftFilter === 'x' ? '未分診' : SHIFTS[currentShiftFilter]);
+    const rangeTxt = `${RANGE_NAME[kind] || ''}（${r.from === r.to ? r.from : r.from.slice(5) + '～' + r.to.slice(5)}）`;
+    // 各診所並列
+    if(catClinic === 'split'){
+      $('#catCtx').textContent = `${rangeTxt}・各診所分別統計${shLab}・僅健保申報`;
+      $('#catBreakdown').innerHTML = '<div class="pie-grid">' + state.clinics.map(c => {
+        const a = agg(c.id), vals = keys.map(k => isPts ? a.pts[k] : a.inc[k]), total = vals.reduce((s, v) => s + v, 0);
+        const head = `<div class="pie-title"><span class="dot" style="background:${esc(c.color)};"></span>${esc(c.name)}</div>`;
+        if(!total) return `<div class="pie-mini">${head}<div class="empty-state" style="padding:18px 8px;">這段期間沒有健保紀錄</div></div>`;
+        const ch = pieChart(vals, isPts, 'small');
+        return `<div class="pie-mini">${head}<div class="pie-wrap">${ch.svg}<div class="pie-legend">${pieLegend(ch.pcts, vals, a.pts, a.inc)}</div></div></div>`;
+      }).join('') + '</div>';
+      return;
+    }
+    // 單一（或全部）診所
+    const cid = catClinic === 'follow' ? (currentClinicFilter !== 'all' ? currentClinicFilter : null) : catClinic === 'all' ? null : catClinic;
+    const cl = cid ? clinicById(cid) : null;
+    $('#catCtx').textContent = `${rangeTxt}・${cl ? cl.name : '全部診所'}${shLab}・僅健保申報`;
+    const a = agg(cid), vals = keys.map(k => isPts ? a.pts[k] : a.inc[k]), total = vals.reduce((s, v) => s + v, 0);
+    if(!total){ $('#catBreakdown').innerHTML = '<div class="empty-state">這段期間沒有健保申報紀錄</div>'; return; }
+    const ch = pieChart(vals, isPts, '');
+    $('#catBreakdown').innerHTML = `<div class="pie-wrap">${ch.svg}<div class="pie-legend">${pieLegend(ch.pcts, vals, a.pts, a.inc)}</div></div>`;
+  }
+  $('#catClinic').addEventListener('click', e => { const b = e.target.closest('[data-cc]'); if(b){ catClinic = b.dataset.cc; lsSet('catClinic', catClinic); renderDash(); } });
   $('#catRange').addEventListener('click', e => { const b = e.target.closest('[data-cr]'); if(b){ catRange = b.dataset.cr; lsSet('catRange', catRange); renderDash(); } });
   $('#catFrom').addEventListener('change', renderDash);
   $('#catTo').addEventListener('change', renderDash);
@@ -2184,7 +2228,7 @@
       }).join('');
     } else bk.style.display = 'none';
 
-    renderCatPie(active);
+    renderCatPie();
 
     const all = [...ins.map(e => ({ ...e, _kind:'ins' })), ...cash.map(e => ({ ...e, _kind:'cash' }))].sort(sortRecent);
     const showClinic = currentClinicFilter === 'all' && state.clinics.length > 1;
