@@ -828,6 +828,42 @@ function parseAI(text) {
   return days.filter(d => /^\d{4}-\d{2}-\d{2}$/.test(d.date || '') && E.parse(d.date).getDay() !== 0)
     .map(d => ({ date: d.date, v: [pick(d, ['early', 'morning', '早']), pick(d, ['noon', 'afternoon', '午']), pick(d, ['night', 'evening', '晚'])].map(Number) }));
 }
+// 辨識結果先預覽、和目前網格逐格比對，按「套用」才寫入
+let pending = null;
+const slotStr = v => (v || [0, 0, 0]).map((x, i) => (x ? SLOTS[i] : '')).join('') || '—';
+function showPreview(days, month) {
+  pending = { days, month };
+  const map = Object.fromEntries(days.map(d => [d.date, d.v]));
+  const diffs = days.filter(({ date, v }) => slotStr(state.schedule[date]) !== slotStr(v));
+  // 該月有排診、但 AI 沒回傳的日期（可能漏看）
+  const missing = [];
+  E.weekMondaysOfMonth(month).forEach(mon => { for (let i = 0; i < 6; i++) { const ds = E.ymd(E.addDays(mon, i)); if (ds.startsWith(month) && !(ds in map) && E.countDay(state.schedule, ds)) missing.push(ds); } });
+  const total = days.reduce((a, d) => a + d.v.filter(Boolean).length, 0);
+  const weeks = E.weekMondaysOfMonth(month).map(mon => {
+    const ds = [...Array(6)].map((_, i) => E.ymd(E.addDays(mon, i)));
+    const ai = ds.reduce((a, d) => a + (map[d] ? map[d].filter(Boolean).length : E.countDay(state.schedule, d)), 0);
+    const cur = ds.reduce((a, d) => a + E.countDay(state.schedule, d), 0);
+    return `<tr><td class="pr-3 tabnum">${E.md(ds[0])}–${E.md(ds[5])}</td><td class="pr-3 text-right tabnum">${cur}</td><td class="text-right tabnum ${ai !== cur ? 'text-red-600 font-bold' : ''}">${ai}</td></tr>`;
+  }).join('');
+  const rows = diffs.map(({ date, v }) => { const d = E.parse(date); return `<tr><td class="pr-3 tabnum">${E.md(d)}（${WD[d.getDay()]}）</td><td class="pr-3">${slotStr(state.schedule[date])}</td><td class="text-red-600 font-semibold">${slotStr(v)}</td></tr>`; }).join('');
+  aiMsg(`<p class="font-semibold">${diffs.length || missing.length ? '🔍' : '✅'} 辨識完成：${days.length} 天、共 ${total} 診（${E.md(days[0].date)}～${E.md(days[days.length - 1].date)}）。尚未寫入。</p>
+    <p class="mt-1">${diffs.length ? `和目前網格有 <b class="text-red-600">${diffs.length}</b> 天不同：` : '和目前網格<b>完全一致</b>。'}</p>
+    ${diffs.length ? `<table class="mt-1 text-xs"><tr class="text-slate-500"><th class="text-left pr-3">日期</th><th class="text-left pr-3">目前</th><th class="text-left">AI 辨識</th></tr>${rows}</table>` : ''}
+    ${missing.length ? `<p class="mt-1 text-amber-700">AI 沒回傳、但目前有排診的日期：${missing.map(E.md).join('、')}（套用後會保留原本資料）</p>` : ''}
+    <details class="mt-1"><summary class="cursor-pointer text-xs">逐週診數對照</summary><table class="mt-1 text-xs"><tr class="text-slate-500"><th class="text-left pr-3">週</th><th class="pr-3">目前</th><th>套用後</th></tr>${weeks}</table></details>
+    <div class="mt-2 flex gap-2"><button data-ai="apply" class="px-3 py-1.5 rounded-lg bg-blue-600 text-white">套用${diffs.length ? `（改 ${diffs.length} 天）` : ''}</button><button data-ai="cancel" class="px-3 py-1.5 rounded-lg border border-slate-300 bg-white">放棄</button></div>`, diffs.length || missing.length ? 'info' : 'ok');
+}
+$('aiStatus').addEventListener('click', e => {
+  const act = e.target.closest('[data-ai]')?.dataset.ai;
+  if (!act || !pending) return;
+  if (act === 'apply') {
+    undoSnap = clone(state.schedule);
+    pending.days.forEach(({ date, v }) => { if (slotStr(state.schedule[date]) !== slotStr(v)) setDay(date, v); });
+    ensureManaged(pending.month); save(); render();
+    aiMsg('✅ 已套用。如有錯誤可直接點格子修正，或按「復原上次辨識/套用」。', 'ok');
+  } else aiMsg('已放棄這次辨識結果，網格沒有變動。', 'info');
+  pending = null;
+});
 $('fileImage').addEventListener('change', async e => {
   const file = e.target.files[0]; e.target.value = '';
   if (!file) return;
@@ -839,11 +875,7 @@ $('fileImage').addEventListener('change', async e => {
     const text = keys.provider === 'claude' ? await callClaude(b64, prompt) : await callGemini(b64, prompt);
     const days = parseAI(text);
     if (!days.length) throw new Error('沒有辨識到任何日期');
-    undoSnap = clone(state.schedule);
-    let total = 0;
-    days.forEach(({ date, v }) => { total += v.filter(Boolean).length; setDay(date, v); });
-    ensureManaged(month); save(); render();
-    aiMsg(`✅ 辨識完成：${days.length} 天、共 ${total} 診已填入（${E.md(days[0].date)}～${E.md(days[days.length - 1].date)}）。請核對下方網格，有誤直接點格子修正；不滿意可按「復原」。`, 'ok');
+    showPreview(days, month);
   } catch (err) {
     aiMsg(`❌ ${err.message}`, 'err');
   }
