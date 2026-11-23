@@ -581,6 +581,24 @@
 .sched-bi.on{border-style:solid; border-color:var(--amber); background:var(--amber-soft); color:#7a5516;}
 .sched-bi:disabled{opacity:.35; cursor:default;}
 
+/* v4.0 month calendar */
+.cal-nav{display:flex; align-items:center; justify-content:space-between; margin-bottom:6px;}
+.cal-nav .btn{min-height:40px; padding:0 16px; font-size:18px;}
+.cal-grid{display:grid; grid-template-columns:repeat(7,minmax(0,1fr)); gap:4px;}
+.cal-grid>b{text-align:center; font-size:12px; color:var(--ink-soft); padding:2px 0;}
+.cal-d{display:flex; flex-direction:column; align-items:center; justify-content:center; gap:1px; min-height:46px; border:1px solid var(--line); background:#fff; border-radius:10px; cursor:pointer; padding:2px 0;}
+.cal-d i{font-style:normal; font-size:14px; font-weight:700; color:var(--ink);}
+.cal-d em{font-style:normal; font-size:11px; color:var(--ink-soft); min-height:14px;}
+.cal-d.work{background:var(--teal-soft,#e3f2ee);}
+.cal-d.work em{color:var(--teal); font-weight:700;}
+.cal-d.ov{border-color:var(--amber); background:var(--amber-soft);}
+.cal-d.ov em{color:#7a5516;}
+.cal-d.today i{text-decoration:underline;}
+.cal-d.sel{outline:2px solid var(--teal); outline-offset:1px;}
+.cal-sel{margin-top:8px;}
+.cal-selh{display:flex; align-items:baseline; gap:8px; margin-bottom:6px;}
+.cal-sel .sched-btns{flex-wrap:wrap;}
+
 </style>
 </head>
 <body>
@@ -944,6 +962,11 @@
     <h3 class="sub-h">每週班表</h3>
     <div id="schedEditor" class="sched"></div>
     <div class="hint" style="margin-top:6px;">按「早／午／晚」選這天有上哪幾診；有隔週上班的，按右邊的鈕設成「隔週」並選本週有沒有班。</div>
+    <h3 class="sub-h">整月班表（加診／停診）</h3>
+    <div id="calNav" class="cal-nav"><button type="button" class="btn btn-ghost" data-cm="prev">‹</button><b id="calTitle"></b><button type="button" class="btn btn-ghost" data-cm="next">›</button></div>
+    <div id="calGrid" class="cal-grid"></div>
+    <div id="calSel" class="cal-sel"></div>
+    <div class="hint" style="margin-top:6px;">日期格會依每週班表自動排好；點某天可加診、臨時停診，調整過的日子會標成橘色，目標也會跟著更新。</div>
     <h3 class="sub-h">自我目標（元，留空＝不設）</h3>
     <div class="row">
       <div class="field"><label for="clGs">每診目標</label><input type="number" id="clGs" inputmode="numeric" min="0" step="100" placeholder="例如 3000"></div>
@@ -1374,7 +1397,7 @@
   function pack(o){ const r = {}; for(const k of KEY_ORDER){ const v = o[k]; if(v !== undefined && v !== null && v !== '') r[KEYS[k]] = v; } return r; }
   function unpack(o){ const r = {}; for(const k in o) r[REV[k] || k] = o[k]; return r; }
   const pick = (o, fields) => { const r = {}; for(const f of fields){ if(o[f] !== undefined && o[f] !== null && o[f] !== '') r[f] = o[f]; } return r; };
-  const CLINIC_F = ['id','name','color','insCommission','pointValue','generalCommission','highCommission','shifts','goals','schedule','biweekly','updatedAt'];
+  const CLINIC_F = ['id','name','color','insCommission','pointValue','generalCommission','highCommission','shifts','goals','schedule','biweekly','overrides','updatedAt'];
   const CODE_F = ['code','name','points','cat','sub','updatedAt'];
   const byI = (a, b) => a.i < b.i ? -1 : a.i > b.i ? 1 : 0;
 
@@ -1620,19 +1643,23 @@
   const WD_NAMES = ['日','一','二','三','四','五','六'];
   const parseD = s => { const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d); };
   const mondayOf = s => { const d = parseD(s), dow = (d.getDay() + 6) % 7; return new Date(d.getFullYear(), d.getMonth(), d.getDate() - dow); };
-  const hasSchedule = c => !!(c && c.schedule && Object.values(c.schedule).some(Boolean));
+  const hasSchedule = c => !!(c && ((c.schedule && Object.values(c.schedule).some(Boolean)) || (c.overrides && Object.keys(c.overrides).length)));
   const hasGoals = c => ['m','a','n','s','d','mo'].some(k => rawGoal(c, k) > 0);
   // 班表：某天排了哪幾診（支援隔週）
-  function scheduledShifts(c, date){
-    if(!hasSchedule(c)) return [];
-    const wd = parseD(date).getDay(), s = c.schedule[wd] || '';
+  function baseShifts(schedule, biweekly, date){
+    const wd = parseD(date).getDay(), s = (schedule && schedule[wd]) || '';
     if(!s) return [];
-    const bi = c.biweekly && c.biweekly[wd];
+    const bi = biweekly && biweekly[wd];
     if(bi){
       const diff = Math.round((mondayOf(date) - mondayOf(bi)) / (7 * 864e5));
       if(((diff % 2) + 2) % 2) return [];
     }
     return ['m','a','n'].filter(k => s.includes(k));
+  }
+  function scheduledShifts(c, date){
+    if(!c) return [];
+    if(c.overrides && typeof c.overrides[date] === 'string') return ['m','a','n'].filter(k => c.overrides[date].includes(k));
+    return baseShifts(c.schedule, c.biweekly, date);
   }
   const shiftGoal = (c, k) => rawGoal(c, k) || rawGoal(c, 's');
   // 當天目標 = 固定當天目標，否則「當天排班的每一診目標加總」（當天實際有記帳的診次也算進來）
@@ -2512,6 +2539,58 @@
     }
     return { schedule, biweekly };
   }
+  let ovDraft = {}, calMonth = '', calSel = '';
+  const calBase = () => { const d = schedFromDraft(); return d; };
+  const calShifts = date => {
+    if(typeof ovDraft[date] === 'string') return ['m','a','n'].filter(k => ovDraft[date].includes(k));
+    const b = calBase(); return baseShifts(b.schedule, b.biweekly, date);
+  };
+  function renderCal(){
+    const y = +calMonth.slice(0, 4), m = +calMonth.slice(5, 7), last = new Date(y, m, 0).getDate();
+    const lead = (new Date(y, m - 1, 1).getDay() + 6) % 7;
+    let cells = '';
+    for(let i = 0; i < lead; i++) cells += '<span></span>';
+    for(let d = 1; d <= last; d++){
+      const ds = `${y}-${pad(m)}-${pad(d)}`, sh = calShifts(ds), ov = typeof ovDraft[ds] === 'string';
+      cells += `<button type="button" class="cal-d ${sh.length ? 'work' : ''} ${ov ? 'ov' : ''} ${ds === calSel ? 'sel' : ''} ${ds === todayStr() ? 'today' : ''}" data-cd="${ds}"><i>${d}</i><em>${sh.map(k => SHIFTS[k][0]).join('') || '·'}</em></button>`;
+    }
+    $('#calGrid').innerHTML = ['一','二','三','四','五','六','日'].map(w => `<b>${w}</b>`).join('') + cells;
+    $('#calTitle').textContent = `${y} 年 ${m} 月`;
+    if(calSel && calSel.slice(0, 7) === calMonth){
+      const sh = calShifts(calSel), ov = typeof ovDraft[calSel] === 'string', dt = parseD(calSel);
+      $('#calSel').innerHTML = `<div class="cal-selh"><b>${dt.getMonth() + 1}/${dt.getDate()}（週${WD_NAMES[dt.getDay()]}）</b><span class="hint">${ov ? '已手動調整' : '依每週班表'}</span></div>
+        <div class="sched-btns">${['m','a','n'].map(k => `<button type="button" class="${sh.includes(k) ? 'on' : ''}" data-ck="${k}">${SHIFTS[k][0]}</button>`).join('')}
+        <button type="button" class="sched-bi" data-ck="off">整天休</button>${ov ? '<button type="button" class="sched-bi on" data-ck="reset">恢復班表</button>' : ''}</div>`;
+    } else $('#calSel').innerHTML = '<div class="hint">點日期可加診、停診或調整當天診次。</div>';
+  }
+  function openCal(c){
+    ovDraft = Object.assign({}, (c && c.overrides) || {});
+    calMonth = todayStr().slice(0, 7); calSel = todayStr(); renderCal();
+  }
+  $('#calNav').addEventListener('click', e => {
+    const b = e.target.closest('button'); if(!b) return;
+    const y = +calMonth.slice(0, 4), m = +calMonth.slice(5, 7), d = new Date(y, m - 1 + (b.dataset.cm === 'next' ? 1 : -1), 1);
+    calMonth = `${d.getFullYear()}-${pad(d.getMonth() + 1)}`; calSel = ''; renderCal();
+  });
+  $('#calGrid').addEventListener('click', e => { const b = e.target.closest('[data-cd]'); if(!b) return; calSel = b.dataset.cd; renderCal(); });
+  $('#calSel').addEventListener('click', e => {
+    const b = e.target.closest('button'); if(!b || !calSel) return;
+    const k = b.dataset.ck, cur = calShifts(calSel);
+    if(k === 'reset') delete ovDraft[calSel];
+    else if(k === 'off') ovDraft[calSel] = '';
+    else ovDraft[calSel] = ['m','a','n'].filter(x => x === k ? !cur.includes(x) : cur.includes(x)).join('');
+    renderCal();
+  });
+  $('#schedEditor').addEventListener('click', () => { if(calMonth) renderCal(); });
+  function overridesFromDraft(){
+    const b = schedFromDraft(), o = {};
+    for(const ds in ovDraft){
+      if(typeof ovDraft[ds] !== 'string') continue;
+      if(baseShifts(b.schedule, b.biweekly, ds).join('') === ['m','a','n'].filter(k => ovDraft[ds].includes(k)).join('')) continue;
+      o[ds] = ovDraft[ds];
+    }
+    return o;
+  }
   let editingClinicId = null;
   function renderSwatches(selected){
     $('#clSwatches').innerHTML = CLINIC_COLORS.map(col => `<span class="swatch ${col === selected ? 'active' : ''}" data-color="${col}" style="background:${col};"></span>`).join('');
@@ -2533,6 +2612,7 @@
     const sh = getShifts(existing);
     [['m','Gm'],['a','Ga'],['n','Gn'],['s','Gs'],['mo','Go']].forEach(([k, id]) => { $('#cl' + id).value = rawGoal(existing, k) || ''; });
     openSchedEditor(existing);
+    openCal(existing);
     [['m','M'],['a','A'],['n','N']].forEach(([k, K]) => { $('#cl' + K + 's').value = (sh[k] && sh[k][0]) || ''; $('#cl' + K + 'e').value = (sh[k] && sh[k][1]) || ''; });
     $('#clinicModalBg').classList.add('show');
   }
@@ -2547,7 +2627,7 @@
       insCommission: num('#clInsCommission'), pointValue: num('#clPointValue'),
       generalCommission: num('#clGeneralCommission'), highCommission: num('#clHighCommission'),
       goals: (() => { const o = {}; [['m','Gm'],['a','Ga'],['n','Gn'],['s','Gs'],['mo','Go']].forEach(([k, id]) => { const v = parseFloat($('#cl' + id).value); if(v > 0) o[k] = v; }); return o; })(),
-      schedule: schedFromDraft().schedule, biweekly: schedFromDraft().biweekly,
+      schedule: schedFromDraft().schedule, biweekly: schedFromDraft().biweekly, overrides: overridesFromDraft(),
       shifts: (() => { const o = {}; [['m','M'],['a','A'],['n','N']].forEach(([k, K]) => { const s = $('#cl' + K + 's').value, e = $('#cl' + K + 'e').value; if(s && e) o[k] = [s, e]; }); return o; })()
     });
     if(editingClinicId){
