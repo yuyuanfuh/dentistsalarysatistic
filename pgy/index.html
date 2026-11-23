@@ -211,33 +211,127 @@ if (typeof module !== 'undefined') module.exports = Engine;
 </script>
 
 <!-- ============ 介面 ============ -->
-<header class="sticky top-0 z-30 bg-white/90 backdrop-blur border-b border-blue-100">
-  <div class="max-w-6xl mx-auto px-4 py-3 flex items-center gap-3">
-    <div class="w-10 h-10 rounded-xl bg-blue-600 text-white grid place-items-center font-bold text-lg shrink-0">傅</div>
+<header class="sticky top-0 z-30 bg-white/85 backdrop-blur border-b border-blue-100">
+  <div class="max-w-5xl mx-auto px-4 py-2.5 flex items-center gap-3">
+    <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-blue-500 to-blue-800 text-white grid place-items-center font-bold shrink-0 shadow">傅</div>
     <div class="min-w-0">
-      <h1 class="font-bold text-blue-900 leading-tight truncate text-base sm:text-lg">牙醫 PGY 診次與補休計算機</h1>
-      <p class="text-xs text-slate-500 truncate">傅醫師專用 · 今天 <span id="todayLabel"></span></p>
+      <h1 class="font-bold text-blue-950 leading-tight truncate text-[15px] sm:text-lg">PGY 診次計算機</h1>
+      <p class="text-[11px] text-slate-500 truncate"><span id="todayLabel"></span></p>
     </div>
-    <div class="ml-auto flex gap-1.5 shrink-0">
+    <div class="ml-auto flex items-center gap-2 shrink-0">
       <button id="syncBadge" class="px-2 py-1.5 rounded-lg text-xs border flex items-center gap-1"><span id="syncDot" class="w-2 h-2 rounded-full bg-slate-300"></span><span id="syncText" class="hidden sm:inline">未同步</span></button>
-      <button id="btnExport" class="px-2.5 py-1.5 rounded-lg text-xs sm:text-sm border border-blue-200 text-blue-700 hover:bg-blue-50">匯出</button>
-      <label class="px-2.5 py-1.5 rounded-lg text-xs sm:text-sm border border-blue-200 text-blue-700 hover:bg-blue-50 cursor-pointer">匯入<input id="fileImport" type="file" accept="application/json,.json" class="hidden"></label>
-      <button id="btnSettings" class="px-2.5 py-1.5 rounded-lg text-xs sm:text-sm bg-blue-600 text-white hover:bg-blue-700">設定</button>
+      <button id="btnSettings" aria-label="設定" class="w-9 h-9 rounded-xl border border-slate-200 bg-white grid place-items-center text-lg hover:bg-slate-50">⚙️</button>
     </div>
   </div>
 </header>
 
-<main class="max-w-6xl mx-auto px-4 py-4 space-y-5 pb-16">
+<main class="max-w-5xl mx-auto px-4 py-4 space-y-4 pb-20">
 
   <div id="iosHint" class="hidden rounded-xl bg-blue-600 text-white text-sm px-4 py-3 flex items-start gap-3">
     <span>在 Safari 點「分享」→「加入主畫面」，就能像 App 一樣全螢幕開啟。</span>
     <button id="iosHintClose" class="ml-auto font-bold">✕</button>
   </div>
 
-  <!-- 設定 -->
-  <details id="settingsPanel" class="rounded-2xl bg-white border border-blue-100 shadow-sm">
-    <summary class="cursor-pointer px-4 py-3 font-semibold text-blue-900 flex items-center">⚙️ 設定（AI 金鑰／計算規則）<span class="ml-auto text-xs text-slate-400">點擊展開</span></summary>
-    <div class="px-4 pb-4 grid gap-4 md:grid-cols-2">
+  <!-- 核心狀態 -->
+  <section id="cards" class="grid grid-cols-2 md:grid-cols-3 gap-3"></section>
+
+  <!-- 請假模擬器 -->
+  <section class="rounded-2xl bg-white border border-slate-200 shadow-sm p-4">
+    <div class="flex items-center justify-between mb-3">
+      <h2 class="font-bold text-blue-950">🧮 請假模擬器</h2>
+      <label class="flex items-center gap-1.5 text-xs text-slate-500"><input id="simAssume" type="checkbox" checked class="w-4 h-4 accent-blue-600">未排班月份以預設班表推估</label>
+    </div>
+    <div class="grid grid-cols-2 gap-3">
+      <label class="block text-sm text-slate-600">請假月份
+        <input id="simMonth" type="month" class="mt-1 w-full h-12 rounded-xl border-slate-300 border px-3 text-base bg-white">
+      </label>
+      <div class="text-sm text-slate-600">預計請假診數
+        <div class="mt-1 flex h-12 rounded-xl border border-slate-300 overflow-hidden bg-white">
+          <button id="simMinus" aria-label="減少" class="w-12 shrink-0 text-2xl text-blue-700 bg-blue-50 active:bg-blue-100 select-none">−</button>
+          <input id="simLeave" type="number" inputmode="numeric" min="0" max="60" value="3" class="min-w-0 flex-1 text-center text-xl font-bold tabnum outline-none">
+          <button id="simPlus" aria-label="增加" class="w-12 shrink-0 text-2xl text-blue-700 bg-blue-50 active:bg-blue-100 select-none">＋</button>
+        </div>
+      </div>
+    </div>
+    <div id="simResult" class="mt-4"></div>
+  </section>
+
+  <!-- 書籤 -->
+  <nav id="tabs" class="sticky top-[57px] z-20 -mx-4 px-4 py-2 bg-gradient-to-b from-blue-50 via-blue-50/95 to-transparent flex gap-2 overflow-x-auto">
+    <button data-tab="grid" class="tab shrink-0 px-4 py-2 rounded-full text-sm font-medium border">📅 班表</button>
+    <button data-tab="timeline" class="tab shrink-0 px-4 py-2 rounded-full text-sm font-medium border">🗂️ 逐週明細</button>
+    <button data-tab="holiday" class="tab shrink-0 px-4 py-2 rounded-full text-sm font-medium border">🎌 國定假日</button>
+  </nav>
+
+  <section data-panel="grid" class="panel hidden rounded-2xl bg-white border border-slate-200 shadow-sm">
+    <div class="px-4 pt-4 pb-3 flex flex-wrap items-center gap-2 border-b border-slate-100">
+      <h2 class="font-bold text-blue-900 mr-1">📅 班表</h2>
+      <div class="flex items-center gap-1">
+        <button id="prevMonth" class="w-8 h-8 rounded-lg border border-slate-200 hover:bg-slate-50">‹</button>
+        <span id="viewMonthLabel" class="font-semibold w-24 text-center tabnum"></span>
+        <button id="nextMonth" class="w-8 h-8 rounded-lg border border-slate-200 hover:bg-slate-50">›</button>
+      </div>
+      <button id="btnManage" class="px-3 py-1.5 rounded-lg text-sm"></button>
+      <div class="w-full sm:w-auto sm:ml-auto flex flex-wrap gap-2">
+        <label class="px-3 py-1.5 rounded-lg text-sm bg-blue-600 text-white cursor-pointer hover:bg-blue-700">📷 上傳班表辨識<input id="fileImage" type="file" accept="image/*" class="hidden"></label>
+        <button id="btnTemplate" class="px-3 py-1.5 rounded-lg text-sm border border-blue-200 text-blue-700 hover:bg-blue-50">套用預設班表</button>
+        <button id="btnClearMonth" class="px-3 py-1.5 rounded-lg text-sm border border-slate-200 text-slate-600 hover:bg-slate-50">清空本月</button>
+        <button id="btnUndo" class="hidden px-3 py-1.5 rounded-lg text-sm border border-amber-300 text-amber-700 bg-amber-50">復原上次辨識/套用</button>
+      </div>
+    </div>
+    <div id="aiStatus" class="hidden mx-4 mt-3 rounded-lg px-3 py-2 text-sm"></div>
+    <div class="px-4 pt-3 flex flex-wrap items-center gap-2 text-xs text-slate-500">
+      <span>列入計算的月份：</span><span id="monthChips" class="flex flex-wrap gap-1.5"></span>
+    </div>
+    <p class="px-4 pt-2 text-xs text-slate-500">點「早／午／晚」切換有無診；點日期可標記「假」。預設班表＝一午晚、二早午晚、三早午、五早午晚（每週 10 診）。</p>
+    <div id="grid" class="p-4 space-y-3"></div>
+  </section>
+
+  <section data-panel="timeline" class="panel hidden rounded-2xl bg-white border border-slate-200 shadow-sm p-4">
+    <div id="timeline"></div>
+  </section>
+
+  <section data-panel="holiday" class="panel hidden rounded-2xl bg-white border border-slate-200 shadow-sm p-4">
+    <div class="flex flex-wrap items-center gap-3">
+      <h2 class="font-bold text-blue-900">🎌 國定假日</h2>
+      <label class="inline-flex items-center gap-2 text-sm cursor-pointer select-none">
+        <input id="holiMode" type="checkbox" class="w-5 h-5 accent-red-500">
+        <span>列入國定假日計算</span>
+      </label>
+      <label class="inline-flex items-center gap-1 text-sm">每天扣低標
+        <input id="holiCredit" type="number" min="0" max="3" class="w-14 rounded-lg border-slate-300 border px-2 py-1 tabnum">診</label>
+    </div>
+    <p id="holiExplain" class="mt-2 text-xs text-slate-500"></p>
+    <details class="mt-3">
+      <summary class="cursor-pointer text-sm text-blue-700">逐日勾選要列入的假日（2026/12–2028）</summary>
+      <div id="holiList" class="mt-3 grid gap-4 md:grid-cols-3 text-sm"></div>
+      <div class="mt-3 flex flex-wrap items-end gap-2 text-sm">
+        <label class="block">自訂假日日期<input id="holiAddDate" type="date" class="mt-1 block rounded-lg border-slate-300 border px-2 py-1.5"></label>
+        <label class="block">名稱<input id="holiAddName" class="mt-1 block w-36 rounded-lg border-slate-300 border px-2 py-1.5" placeholder="例：診所公休"></label>
+        <button id="holiAdd" class="px-3 py-1.5 rounded-lg bg-blue-600 text-white">新增</button>
+      </div>
+    </details>
+  </section>
+</main>
+
+<!-- 設定抽屜 -->
+<div id="drawer" class="fixed inset-0 z-40 hidden">
+  <div id="drawerBg" class="absolute inset-0 bg-slate-900/40"></div>
+  <aside class="absolute right-0 top-0 h-full w-full max-w-xl bg-slate-50 shadow-2xl overflow-y-auto" style="padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom)">
+    <div class="sticky top-0 z-10 bg-white border-b border-slate-200 px-4 py-3 flex items-center">
+      <h2 class="font-bold text-blue-950">⚙️ 設定</h2>
+      <button id="drawerClose" class="ml-auto w-9 h-9 rounded-xl border border-slate-200 text-lg">✕</button>
+    </div>
+    <div class="p-4 space-y-4">
+      <div class="rounded-2xl bg-white border border-slate-200 p-4">
+        <h3 class="text-sm font-semibold text-slate-700 mb-2">💾 備份</h3>
+        <div class="flex flex-wrap gap-2">
+          <button id="btnExport" class="px-4 py-2 rounded-lg text-sm border border-blue-200 text-blue-700">匯出 JSON</button>
+          <label class="px-4 py-2 rounded-lg text-sm border border-blue-200 text-blue-700 cursor-pointer">匯入 JSON<input id="fileImport" type="file" accept="application/json,.json" class="hidden"></label>
+        </div>
+      </div>
+      <div class="rounded-2xl bg-white border border-slate-200">
+    <div class="p-4 grid gap-4">
       <div class="space-y-3">
         <h3 class="text-sm font-semibold text-slate-700">AI 視覺辨識</h3>
         <label class="block text-sm">使用服務
@@ -315,89 +409,10 @@ if (typeof module !== 'undefined') module.exports = Engine;
         </details>
       </div>
     </div>
-  </details>
-
-  <!-- 狀態卡 -->
-  <section id="cards" class="grid gap-3 md:grid-cols-3"></section>
-
-  <!-- 班表 -->
-  <section class="rounded-2xl bg-white border border-blue-100 shadow-sm">
-    <div class="px-4 pt-4 pb-3 flex flex-wrap items-center gap-2 border-b border-slate-100">
-      <h2 class="font-bold text-blue-900 mr-1">📅 班表</h2>
-      <div class="flex items-center gap-1">
-        <button id="prevMonth" class="w-8 h-8 rounded-lg border border-slate-200 hover:bg-slate-50">‹</button>
-        <span id="viewMonthLabel" class="font-semibold w-24 text-center tabnum"></span>
-        <button id="nextMonth" class="w-8 h-8 rounded-lg border border-slate-200 hover:bg-slate-50">›</button>
-      </div>
-      <button id="btnManage" class="px-3 py-1.5 rounded-lg text-sm"></button>
-      <div class="w-full sm:w-auto sm:ml-auto flex flex-wrap gap-2">
-        <label class="px-3 py-1.5 rounded-lg text-sm bg-blue-600 text-white cursor-pointer hover:bg-blue-700">📷 上傳班表辨識<input id="fileImage" type="file" accept="image/*" class="hidden"></label>
-        <button id="btnTemplate" class="px-3 py-1.5 rounded-lg text-sm border border-blue-200 text-blue-700 hover:bg-blue-50">套用預設班表</button>
-        <button id="btnClearMonth" class="px-3 py-1.5 rounded-lg text-sm border border-slate-200 text-slate-600 hover:bg-slate-50">清空本月</button>
-        <button id="btnUndo" class="hidden px-3 py-1.5 rounded-lg text-sm border border-amber-300 text-amber-700 bg-amber-50">復原上次辨識/套用</button>
       </div>
     </div>
-    <div id="aiStatus" class="hidden mx-4 mt-3 rounded-lg px-3 py-2 text-sm"></div>
-    <div class="px-4 pt-3 flex flex-wrap items-center gap-2 text-xs text-slate-500">
-      <span>列入計算的月份：</span><span id="monthChips" class="flex flex-wrap gap-1.5"></span>
-    </div>
-    <p class="px-4 pt-2 text-xs text-slate-500">點「早／午／晚」切換有無診；點日期可標記「假」。預設班表＝一午晚、二早午晚、三早午、五早午晚（每週 10 診）。</p>
-    <div id="grid" class="p-4 space-y-3"></div>
-  </section>
-
-  <!-- 國定假日 -->
-  <section class="rounded-2xl bg-white border border-blue-100 shadow-sm p-4">
-    <div class="flex flex-wrap items-center gap-3">
-      <h2 class="font-bold text-blue-900">🎌 國定假日</h2>
-      <label class="inline-flex items-center gap-2 text-sm cursor-pointer select-none">
-        <input id="holiMode" type="checkbox" class="w-5 h-5 accent-red-500">
-        <span>列入國定假日計算</span>
-      </label>
-      <label class="inline-flex items-center gap-1 text-sm">每天扣低標
-        <input id="holiCredit" type="number" min="0" max="3" class="w-14 rounded-lg border-slate-300 border px-2 py-1 tabnum">診</label>
-    </div>
-    <p id="holiExplain" class="mt-2 text-xs text-slate-500"></p>
-    <details class="mt-3">
-      <summary class="cursor-pointer text-sm text-blue-700">逐日勾選要列入的假日（2026/12–2028）</summary>
-      <div id="holiList" class="mt-3 grid gap-4 md:grid-cols-3 text-sm"></div>
-      <div class="mt-3 flex flex-wrap items-end gap-2 text-sm">
-        <label class="block">自訂假日日期<input id="holiAddDate" type="date" class="mt-1 block rounded-lg border-slate-300 border px-2 py-1.5"></label>
-        <label class="block">名稱<input id="holiAddName" class="mt-1 block w-36 rounded-lg border-slate-300 border px-2 py-1.5" placeholder="例：診所公休"></label>
-        <button id="holiAdd" class="px-3 py-1.5 rounded-lg bg-blue-600 text-white">新增</button>
-      </div>
-    </details>
-  </section>
-
-  <!-- 請假模擬器 -->
-  <section class="rounded-2xl bg-white border border-blue-100 shadow-sm p-4">
-    <h2 class="font-bold text-blue-900 mb-3">🧮 請假模擬器</h2>
-    <div class="grid gap-3 sm:grid-cols-3 items-end">
-      <label class="block text-sm">請假月份
-        <input id="simMonth" type="month" class="mt-1 w-full rounded-lg border-slate-300 border px-3 py-2">
-      </label>
-      <label class="block text-sm">預計請假診數
-        <div class="mt-1 flex gap-1.5">
-          <input id="simLeave" type="number" min="0" max="60" value="3" class="w-20 rounded-lg border-slate-300 border px-3 py-2 tabnum">
-          <button data-q="3" class="simQ px-3 rounded-lg border border-slate-200 text-sm">3</button>
-          <button data-q="6" class="simQ px-3 rounded-lg border border-slate-200 text-sm">6</button>
-          <button data-q="9" class="simQ px-3 rounded-lg border border-slate-200 text-sm">9</button>
-        </div>
-      </label>
-      <label class="flex items-center gap-2 text-sm pb-2">
-        <input id="simAssume" type="checkbox" checked class="w-4 h-4 accent-blue-600">未排班月份以預設班表推估
-      </label>
-    </div>
-    <div id="simResult" class="mt-4"></div>
-  </section>
-
-  <!-- 逐週明細 -->
-  <section class="rounded-2xl bg-white border border-blue-100 shadow-sm p-4">
-    <h2 class="font-bold text-blue-900 mb-3">🗂️ 逐週明細時間軸</h2>
-    <div id="timeline"></div>
-  </section>
-
-  <p class="text-xs text-slate-400 text-center">資料儲存在本機瀏覽器，換手機前請先「匯出」備份。</p>
-</main>
+  </aside>
+</div>
 
 <div id="toast" class="toast fixed left-1/2 -translate-x-1/2 bottom-6 z-50 px-4 py-2 rounded-xl bg-slate-900 text-white text-sm opacity-0 pointer-events-none"></div>
 
@@ -546,35 +561,46 @@ function renderCards(a, alt) {
   const groups = {};
   a.sur.filter(s => s.remaining > 0 && !s.expired).forEach(s => {
     const k = s.week.cross ? 'x' + s.week.id : 'm' + s.week.month;
-    if (!groups[k]) groups[k] = { label: s.week.cross ? `跨月週 ${range(s.week)}（歸${E.mShort(s.week.month)}）` : `${E.mShort(s.week.month)}盈餘`, n: 0, expiry: s.expiry, mi: s.mi, id: s.week.id };
+    if (!groups[k]) groups[k] = { label: s.week.cross ? `跨月週 ${E.md(s.week.start)}` : `${E.mShort(s.week.month)}盈餘`, n: 0, expiry: s.expiry, mi: s.mi, id: s.week.id };
     groups[k].n += s.remaining;
   });
   const gl = Object.values(groups).sort((x, y) => x.mi - y.mi || (x.id < y.id ? -1 : 1));
 
+  const shortExp = mi => `${E.mShort(E.mKey(mi))}底`;
+  const hm = state.settings.holidayMode;
+  const pct = cur ? Math.min(100, Math.round(cur.actual / Math.max(1, cur.min) * 100)) : 0;
+  const dayDots = cur ? cur.days.map(ds => {
+    const n = E.countDay(state.schedule, ds), d = E.parse(ds), today = ds === TODAY_S, hol = cur.hol.includes(ds);
+    return `<div class="flex flex-col items-center gap-0.5"><span class="text-[10px] ${today ? 'text-blue-700 font-bold' : 'text-slate-400'}">${WD[d.getDay()]}</span>
+      <span class="w-7 h-7 rounded-lg grid place-items-center text-xs font-bold tabnum ${hol ? 'bg-red-50 text-red-500' : n ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-300'} ${today ? 'ring-2 ring-blue-300' : ''}">${hol && !n ? '休' : n || '·'}</span></div>`;
+  }).join('') : '';
+
   $('cards').innerHTML = `
-    <div class="rounded-2xl p-4 border shadow-sm ${open ? 'bg-red-50 border-red-200' : 'bg-white border-emerald-200'}">
-      <p class="text-sm text-slate-500">目前累計缺診數</p>
-      <p class="mt-1 text-3xl font-bold tabnum ${open ? 'text-red-600' : 'text-emerald-600'}">${open} 診${open ? '' : '<span class="text-lg">（安全）</span>'}</p>
-      <p class="mt-2 text-xs text-slate-500">${open
-        ? `其中 ${a.deficitHard} 診已超過互補期限無法補；${open - a.deficitHard} 診需靠後續月份盈餘補平。`
-        : `所有缺口皆已配對補平（總缺口 ${a.totalDeficit} 診、總盈餘 ${a.totalSurplus} 診）。`}</p>
+    <div class="rounded-3xl p-4 shadow-sm border ${open ? 'bg-gradient-to-br from-red-500 to-rose-600 border-red-500 text-white' : 'bg-gradient-to-br from-emerald-500 to-teal-600 border-emerald-500 text-white'}">
+      <p class="text-[13px] opacity-90">目前累計缺診</p>
+      <p class="mt-1 flex items-baseline gap-1"><span class="text-5xl font-extrabold tabnum leading-none">${open}</span><span class="text-base">診</span></p>
+      <p class="mt-2 inline-block rounded-full bg-white/20 px-2.5 py-0.5 text-xs font-semibold">${open ? (a.deficitHard ? `⚠️ ${a.deficitHard} 診已無法補` : '⏳ 待後續盈餘補平') : '✅ 安全'}</p>
+      <p class="mt-2 text-[11px] opacity-80">缺口 ${a.totalDeficit} 診 · 已配對補平 ${a.totalDeficit - open} 診</p>
     </div>
-    <div class="rounded-2xl p-4 bg-white border border-blue-200 shadow-sm">
-      <p class="text-sm text-slate-500">目前可用盈餘（尚可請假額度）</p>
-      <p class="mt-1 text-3xl font-bold tabnum text-blue-700">+${a.available} 診</p>
-      <ul class="mt-2 space-y-1 text-xs">${gl.length ? gl.map(g => `<li class="flex justify-between gap-2"><span>${g.label} <b class="text-emerald-600">+${g.n}</b> 診</span><span class="text-slate-500 shrink-0">可用至 ${expiryLabel(g.expiry)}</span></li>`).join('') : '<li class="text-slate-400">目前沒有可用盈餘</li>'}</ul>
-      <p class="mt-2 text-[11px] text-slate-400">含已排定的未來週；扣除已用於補缺口的部分。</p>
-      <div class="mt-2 rounded-lg ${state.settings.holidayMode ? 'bg-red-50 text-red-700' : 'bg-slate-50 text-slate-600'} px-2 py-1.5 text-xs">
-        🎌 目前${state.settings.holidayMode ? '<b>已列入</b>' : '<b>未列入</b>'}國定假日。若${state.settings.holidayMode ? '不列入' : '列入'}：可用 <b>+${alt.available}</b>、缺 <b>${alt.deficitOpen}</b> 診
+    <div class="rounded-3xl p-4 shadow-sm bg-gradient-to-br from-blue-600 to-indigo-700 text-white">
+      <p class="text-[13px] opacity-90">可用盈餘（可請假）</p>
+      <p class="mt-1 flex items-baseline gap-1"><span class="text-5xl font-extrabold tabnum leading-none">+${a.available}</span><span class="text-base">診</span></p>
+      <ul class="mt-2 space-y-0.5 text-[11px] leading-snug">${gl.length ? gl.map(g => `<li class="flex justify-between gap-1"><span class="truncate">${g.label.replace(/（歸.*?）/, '').replace('盈餘', '')} <b>+${g.n}</b></span><span class="opacity-80 shrink-0">至${shortExp(g.expiry)}</span></li>`).join('') : '<li class="opacity-70">目前沒有可用盈餘</li>'}</ul>
+    </div>
+    <div class="col-span-2 md:col-span-1 rounded-3xl p-4 shadow-sm bg-white border border-slate-200">
+      <div class="flex items-center">
+        <p class="text-[13px] text-slate-500">本週狀態</p>
+        ${cur ? `<span class="ml-auto rounded-full px-2.5 py-0.5 text-xs font-bold ${cur.net > 0 ? 'bg-emerald-50 text-emerald-700' : cur.net < 0 ? 'bg-red-50 text-red-600' : 'bg-slate-100 text-slate-600'}">淨額 ${signed(cur.net)}</span>` : ''}
       </div>
-    </div>
-    <div class="rounded-2xl p-4 bg-white border border-slate-200 shadow-sm">
-      <p class="text-sm text-slate-500">本週狀態</p>
-      ${cur ? `<p class="mt-1 text-lg font-semibold">${range(cur)}</p>
-        <p class="tabnum">已排 <b>${cur.actual}</b> 診 · 淨額 <b class="${netCls(cur.net)}">${signed(cur.net)}</b></p>` : '<p class="mt-1 text-slate-400">今天是週日</p>'}
-      <p class="mt-3 text-sm text-slate-500">已過期失效盈餘</p>
-      <p class="text-xl font-bold tabnum ${a.expired ? 'text-slate-500 line-through' : 'text-slate-300'}">${a.expired} 診</p>
+      ${cur ? `<p class="mt-1 flex items-baseline gap-1.5"><span class="text-3xl font-extrabold tabnum text-blue-950">${cur.actual}</span><span class="text-sm text-slate-500">/ 低標 ${cur.min} 診</span><span class="ml-auto text-xs text-slate-400 tabnum">${range(cur)}</span></p>
+        <div class="mt-2 h-2 rounded-full bg-slate-100 overflow-hidden"><div class="h-full rounded-full ${cur.net >= 0 ? 'bg-emerald-500' : 'bg-red-500'}" style="width:${pct}%"></div></div>
+        <div class="mt-3 grid grid-cols-6 gap-1 justify-items-center">${dayDots}</div>` : '<p class="mt-2 text-slate-400">今天是週日，好好休息 🙂</p>'}
+      <div class="mt-3 flex flex-wrap gap-1.5 text-[11px]">
+        <button id="cardHoli" class="rounded-full px-2 py-0.5 ${hm ? 'bg-red-50 text-red-600' : 'bg-slate-100 text-slate-600'}">🎌 ${hm ? '已列入' : '未列入'}國定假日 · 若${hm ? '不列入' : '列入'}可用 +${alt.available}</button>
+        ${a.expired ? `<span class="rounded-full px-2 py-0.5 bg-slate-100 text-slate-500">已過期 ${a.expired} 診</span>` : ''}
+      </div>
     </div>`;
+  $('cardHoli').onclick = () => setTab('holiday');
 }
 
 // ---------- 班表網格 ----------
@@ -630,19 +656,20 @@ function renderSim() {
   const r = E.simulate(state.schedule, state.months, opt(), target, L, assume, TEMPLATE);
   const managed = state.months.includes(target);
   const head = r.need > 0
-    ? `<div class="rounded-xl bg-red-50 border border-red-200 p-4"><p class="text-sm text-red-700">${E.mLabel(target)}請 ${L} 診</p><p class="text-2xl font-bold text-red-600 tabnum">還需額外多上 ${r.need} 診</p><p class="text-sm text-red-700 mt-1">該月最多可請 ${r.max} 診而不產生缺口。</p></div>`
-    : `<div class="rounded-xl bg-emerald-50 border border-emerald-200 p-4"><p class="text-sm text-emerald-700">${E.mLabel(target)}請 ${L} 診</p><p class="text-2xl font-bold text-emerald-600 tabnum">可完全抵銷，還剩 ${r.left} 診可請</p><p class="text-sm text-emerald-700 mt-1">該月最多可請 ${r.max} 診。</p></div>`;
+    ? `<div class="rounded-xl bg-red-50 border border-red-200 p-4"><p class="text-sm text-red-700">${E.mLabel(target)}請 ${L} 診</p><p class="text-xl font-bold text-red-600 tabnum">還需額外多上 ${r.need} 診</p><p class="text-sm text-red-700 mt-1">該月最多可請 ${r.max} 診而不產生缺口。</p></div>`
+    : `<div class="rounded-xl bg-emerald-50 border border-emerald-200 p-4"><p class="text-sm text-emerald-700">${E.mLabel(target)}請 ${L} 診</p><p class="text-xl font-bold text-emerald-600 tabnum">可完全抵銷，還剩 ${r.left} 診可請</p><p class="text-sm text-emerald-700 mt-1">該月最多可請 ${r.max} 診。</p></div>`;
   const weeks = r.monthWeeks.map(w => `<li class="flex justify-between tabnum"><span>${range(w)}${w.cross ? ' <span class="text-violet-600">跨月</span>' : ''}${r.added.includes(w.month) ? ' <span class="text-amber-600">推估</span>' : ''}</span><span>${w.actual} 診 <b class="${netCls(w.net)}">${signed(w.net)}</b></span></li>`).join('') || '<li class="text-slate-400">該月尚無週資料（可勾選推估）</li>';
   const src = r.sources.map(s => `<li class="flex justify-between tabnum"><span>${range(s.week)} 週（${E.mShort(s.week.month)}${r.added.includes(s.week.month) ? '・推估' : ''}）</span><span><b class="text-emerald-600">+${s.remaining}</b> · 至${expiryLabel(s.expiry)}</span></li>`).join('') || '<li class="text-slate-400">無</li>';
   const fills = r.fills.map(f => `<li>由 ${range(f.s.week)} 週（${E.mShort(f.s.week.month)}）補 ${f.n} 診</li>`).join('');
   $('simResult').innerHTML = `${head}
-    <div class="grid gap-3 md:grid-cols-3 mt-3 text-sm">
+    <details class="mt-2 group"><summary class="cursor-pointer text-sm text-blue-700 py-1">查看計算明細 ▾</summary>
+    <div class="grid gap-3 md:grid-cols-3 mt-2 text-sm">
       <div class="rounded-xl border border-slate-200 p-3"><p class="font-semibold mb-1">${E.mShort(target)}各週${managed ? '' : (assume ? '（預設班表推估）' : '')}</p><ul class="space-y-0.5">${weeks}</ul></div>
       <div class="rounded-xl border border-slate-200 p-3"><p class="font-semibold mb-1">可用於${E.mShort(target)}的盈餘（請假前）</p><ul class="space-y-0.5">${src}</ul></div>
       <div class="rounded-xl border border-slate-200 p-3"><p class="font-semibold mb-1">這次請假的抵銷來源</p><ul class="space-y-0.5">${fills || '<li class="text-slate-400">—</li>'}</ul>
         ${r.need > 0 ? `<p class="mt-1 text-red-600">不足 ${r.need} 診</p>` : ''}</div>
     </div>
-    <p class="mt-2 text-xs text-slate-400">假設請假造成的缺口落在${E.mShort(target)}，依「最舊盈餘優先」與其他缺口一起重新配對；${assume ? `未列入計算的月份（${r.added.map(E.mShort).join('、') || '無'}）以每週 10 診推估。` : '未排班月份不推估。'}</p>`;
+    <p class="mt-2 text-xs text-slate-400">假設請假造成的缺口落在${E.mShort(target)}，依「最舊盈餘優先」與其他缺口一起重新配對；${assume ? `未列入計算的月份（${r.added.map(E.mShort).join('、') || '無'}）以每週 10 診推估。` : '未排班月份不推估。'}</p></details>`;
 }
 
 // ---------- 逐週明細 ----------
@@ -1009,7 +1036,7 @@ $('cloudConnect').onclick = () => {
 };
 $('cloudSyncNow').onclick = () => { if (!cloudOn()) { toast('請先儲存 Token 與 Gist ID'); return; } connectAndSync('同步中…'); };
 $('syncBadge').onclick = () => {
-  if (!cloudOn()) { const p = $('settingsPanel'); p.open = true; p.scrollIntoView({ behavior: 'smooth' }); return; }
+  if (!cloudOn()) { openDrawer('cloudToken'); return; }
   connectAndSync('同步中…');
 };
 $('cloudDisconnect').onclick = () => {
@@ -1040,7 +1067,34 @@ window.addEventListener('online', () => { if (cloudOn()) syncNow(); });
 $('simMonth').value = E.mKey(TI + 2);
 ['simMonth', 'simLeave', 'simAssume'].forEach(id => $(id).addEventListener('input', renderSim));
 $('simAssume').addEventListener('change', renderSim);
-document.querySelectorAll('.simQ').forEach(b => (b.onclick = () => { $('simLeave').value = b.dataset.q; renderSim(); }));
+const stepLeave = d => { const el = $('simLeave'); el.value = Math.max(0, Math.min(60, (parseInt(el.value, 10) || 0) + d)); renderSim(); };
+$('simMinus').onclick = () => stepLeave(-1);
+$('simPlus').onclick = () => stepLeave(1);
+$('simLeave').addEventListener('focus', e => e.target.select());
+
+// ---------- 書籤 ----------
+const TABKEY = 'pgy_fu_tab';
+let curTab = ''; try { curTab = localStorage.getItem(TABKEY) || ''; } catch (e) {}
+function setTab(t) {
+  curTab = t;
+  try { localStorage.setItem(TABKEY, t); } catch (e) {}
+  document.querySelectorAll('.tab').forEach(b => {
+    const on = b.dataset.tab === t;
+    b.className = 'tab shrink-0 px-4 py-2 rounded-full text-sm font-medium border transition ' + (on ? 'bg-blue-600 text-white border-blue-600 shadow' : 'bg-white text-slate-600 border-slate-200');
+  });
+  document.querySelectorAll('.panel').forEach(p => p.classList.toggle('hidden', p.dataset.panel !== t));
+}
+document.querySelectorAll('.tab').forEach(b => (b.onclick = () => setTab(curTab === b.dataset.tab ? '' : b.dataset.tab)));
+setTab(curTab);
+
+// ---------- 設定抽屜 ----------
+function openDrawer(focusId) {
+  $('drawer').classList.remove('hidden'); document.body.style.overflow = 'hidden';
+  if (focusId) setTimeout(() => $(focusId).scrollIntoView({ block: 'center' }), 50);
+}
+function closeDrawer() { $('drawer').classList.add('hidden'); document.body.style.overflow = ''; }
+$('drawerClose').onclick = closeDrawer;
+$('drawerBg').onclick = closeDrawer;
 
 // ---------- 設定 ----------
 function fillSettings() {
@@ -1048,7 +1102,7 @@ function fillSettings() {
   $('setGeminiModel').value = keys.geminiModel; $('setClaudeModel').value = keys.claudeModel;
   $('setDoctor').value = opt().doctor; $('setMin').value = opt().minPerWeek; $('setWindow').value = opt().window; $('setCross').value = opt().crossRule;
 }
-$('btnSettings').onclick = () => { const p = $('settingsPanel'); p.open = !p.open; if (p.open) p.scrollIntoView({ behavior: 'smooth' }); };
+$('btnSettings').onclick = () => openDrawer();
 $('btnSaveSettings').onclick = () => {
   Object.assign(keys, { provider: $('setProvider').value, geminiKey: $('setGeminiKey').value.trim(), claudeKey: $('setClaudeKey').value.trim(),
     geminiModel: $('setGeminiModel').value.trim() || defaultKeys().geminiModel, claudeModel: $('setClaudeModel').value.trim() || defaultKeys().claudeModel });
