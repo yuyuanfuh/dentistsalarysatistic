@@ -1,0 +1,1087 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="PGY診次">
+<meta name="theme-color" content="#1d4ed8">
+<title>牙醫 PGY 診次與補休計算機（傅醫師專用）</title>
+<link rel="apple-touch-icon" id="touchIcon" href="">
+<link rel="manifest" id="manifestLink" href="">
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "PingFang TC", "Noto Sans TC", "Microsoft JhengHei", sans-serif;
+    padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+    -webkit-tap-highlight-color: transparent;
+  }
+  .slot { transition: background-color .12s, color .12s, transform .08s; }
+  .slot:active { transform: scale(.92); }
+  .slot-on  { background:#2563eb; color:#fff; border-color:#2563eb; }
+  .slot-off { background:#fff; color:#94a3b8; border-color:#e2e8f0; }
+  .tabnum { font-variant-numeric: tabular-nums; }
+  details > summary { list-style: none; }
+  details > summary::-webkit-details-marker { display: none; }
+  .toast { transition: opacity .25s, transform .25s; }
+</style>
+</head>
+<body class="bg-gradient-to-b from-blue-50 to-white min-h-screen text-slate-800">
+
+<!-- ============ 計算引擎（純函式，無 DOM） ============ -->
+<script id="engine">
+const Engine = (() => {
+  const pad = n => String(n).padStart(2, '0');
+  const ymd = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  const parse = s => { const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d); };
+  const addDays = (d, n) => new Date(d.getFullYear(), d.getMonth(), d.getDate() + n);
+  const mKeyOf = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}`;
+  const mIdx = k => { const [y, m] = k.split('-').map(Number); return y * 12 + m - 1; };
+  const mKey = i => `${Math.floor(i / 12)}-${pad(i % 12 + 1)}`;
+  const mondayOf = d => addDays(d, -((d.getDay() + 6) % 7));
+  const md = s => { const d = typeof s === 'string' ? parse(s) : s; return `${d.getMonth() + 1}/${d.getDate()}`; };
+  const mLabel = k => { const [y, m] = k.split('-').map(Number); return `${y}年${m}月`; };
+  const mShort = k => `${Number(k.split('-')[1])}月`;
+
+  // 跨月週歸屬：majority = 天數較多月份（同數時依週一），monday = 週一所屬月份
+  function assignMonth(monday, rule) {
+    const cnt = {};
+    for (let i = 0; i < 6; i++) { const k = mKeyOf(addDays(monday, i)); cnt[k] = (cnt[k] || 0) + 1; }
+    const monK = mKeyOf(monday);
+    if (rule === 'monday') return monK;
+    let best = monK;
+    for (const k in cnt) if (cnt[k] > cnt[best]) best = k;
+    return best;
+  }
+
+  // 與該月份（週一～週六）有重疊的所有週
+  function weekMondaysOfMonth(key) {
+    const [y, m] = key.split('-').map(Number);
+    const first = new Date(y, m - 1, 1), last = new Date(y, m, 0);
+    const res = [];
+    for (let mon = mondayOf(first); mon <= last; mon = addDays(mon, 7)) {
+      let hit = false;
+      for (let i = 0; i < 6; i++) { const d = addDays(mon, i); if (d >= first && d <= last) hit = true; }
+      if (hit) res.push(mon);
+    }
+    return res;
+  }
+
+  const countDay = (sched, ds) => (sched[ds] || []).filter(Boolean).length;
+
+  function makeWeek(sched, mon, opt) {
+    const days = [...Array(6)].map((_, i) => ymd(addDays(mon, i)));
+    const actual = days.reduce((s, ds) => s + countDay(sched, ds), 0);
+    const month = assignMonth(mon, opt.crossRule);
+    // 國定假日（週一～週六）每天扣減低標 holidayCredit 診
+    const hol = opt.holidays ? days.filter(ds => opt.holidays.has(ds)) : [];
+    const min = Math.max(0, opt.minPerWeek - (opt.holidayCredit || 0) * hol.length);
+    return {
+      id: days[0], start: days[0], end: days[5], days, month, mi: mIdx(month),
+      cross: mKeyOf(mon) !== mKeyOf(addDays(mon, 5)), actual, hol, min, net: actual - min
+    };
+  }
+
+  function buildWeeks(sched, months, opt) {
+    const set = new Set(months), seen = new Map();
+    months.forEach(k => weekMondaysOfMonth(k).forEach(mon => {
+      const id = ymd(mon);
+      if (seen.has(id)) return;
+      const w = makeWeek(sched, mon, opt);
+      if (set.has(w.month)) seen.set(id, w);
+    }));
+    return [...seen.values()].sort((a, b) => (a.id < b.id ? -1 : 1));
+  }
+
+  // 互補配對：缺口依月份先後處理，每次取「有效期限最早（最舊月份）」且在 ±window 個月內的盈餘（預設 window = 1）
+  function allocate(weeks, opt, extras = []) {
+    const W = opt.window;
+    const sur = weeks.filter(w => w.net > 0).map(w => ({ week: w, mi: w.mi, amount: w.net, remaining: w.net, expiry: w.mi + W, uses: [] }));
+    const defs = weeks.filter(w => w.net < 0).map(w => ({ week: w, mi: w.mi, need: -w.net, unfilled: -w.net, fills: [], order: w.id }));
+    extras.forEach((e, i) => defs.push({ week: null, synthetic: true, label: e.label, mi: e.mi, need: e.amount, unfilled: e.amount, fills: [], order: '9999-' + i }));
+    defs.sort((a, b) => a.mi - b.mi || (a.order < b.order ? -1 : 1));
+    for (const d of defs) {
+      while (d.unfilled > 0) {
+        let best = null;
+        for (const s of sur) {
+          if (s.remaining <= 0) continue;
+          if (d.mi < s.mi - W || d.mi > s.mi + W) continue;
+          if (!best || s.mi < best.mi || (s.mi === best.mi && s.week.id < best.week.id)) best = s;
+        }
+        if (!best) break;
+        const take = Math.min(best.remaining, d.unfilled);
+        best.remaining -= take; d.unfilled -= take;
+        d.fills.push({ s: best, n: take }); best.uses.push({ d, n: take });
+      }
+    }
+    return { sur, defs };
+  }
+
+  function analyze(sched, months, opt, today) {
+    const weeks = buildWeeks(sched, months, opt);
+    const { sur, defs } = allocate(weeks, opt);
+    const ti = mIdx(mKeyOf(today));
+    sur.forEach(s => { s.expired = s.remaining > 0 && ti > s.expiry; });
+    defs.forEach(d => { d.hard = d.unfilled > 0 && ti > d.mi + opt.window; });
+    const sum = (arr, f) => arr.reduce((a, x) => a + f(x), 0);
+    return {
+      weeks, sur, defs,
+      available: sum(sur.filter(s => !s.expired), s => s.remaining),
+      expired: sum(sur.filter(s => s.expired), s => s.remaining),
+      deficitOpen: sum(defs, d => d.unfilled),
+      deficitHard: sum(defs.filter(d => d.hard), d => d.unfilled),
+      totalSurplus: sum(sur, s => s.amount),
+      totalDeficit: sum(defs, d => d.need)
+    };
+  }
+
+  // 未排班月份以預設班表推估（不動已列入計算月份的週）
+  function fillTemplate(sched, months, opt, fromIdx, toIdx, template) {
+    const s = JSON.parse(JSON.stringify(sched)), ms = [...months], added = [];
+    for (let i = fromIdx; i <= toIdx; i++) { const k = mKey(i); if (!ms.includes(k)) { ms.push(k); added.push(k); } }
+    const addedSet = new Set(added);
+    added.forEach(k => weekMondaysOfMonth(k).forEach(mon => {
+      if (!addedSet.has(assignMonth(mon, opt.crossRule))) return;
+      for (let i = 0; i < 6; i++) {
+        const d = addDays(mon, i), ds = ymd(d);
+        if (s[ds] || (opt.holidays && opt.holidays.has(ds))) continue;
+        const t = template[d.getDay()];
+        if (t && t.some(Boolean)) s[ds] = [...t];
+      }
+    }));
+    return { sched: s, months: ms, added };
+  }
+
+  function simulate(sched, months, opt, targetKey, leave, assume, template) {
+    const ti = mIdx(targetKey);
+    let S = sched, M = months, added = [];
+    if (assume) {
+      const from = Math.min(ti, ...months.map(mIdx));
+      ({ sched: S, months: M, added } = fillTemplate(sched, months, opt, from, ti + opt.window, template));
+    }
+    const weeks = buildWeeks(S, M, opt);
+    const run = L => {
+      const r = allocate(weeks, opt, L > 0 ? [{ mi: ti, amount: L, label: '模擬請假' }] : []);
+      return { r, u: r.defs.reduce((a, d) => a + d.unfilled, 0) };
+    };
+    const base = run(0), withL = run(leave);
+    let max = 0;
+    for (let L = 1; L <= 300; L++) { if (run(L).u > base.u) break; max = L; }
+    const syn = withL.r.defs.find(d => d.synthetic);
+    return {
+      need: withL.u - base.u, max, left: max - leave, added,
+      monthWeeks: weeks.filter(w => w.mi === ti),
+      sources: base.r.sur.filter(s => s.remaining > 0 && ti >= s.mi - opt.window && ti <= s.mi + opt.window),
+      fills: syn ? syn.fills : []
+    };
+  }
+
+  // 跨裝置合併：每筆資料各有時間戳，較新者勝（刪除也有時間戳）
+  function mergeStates(L, R) {
+    const out = JSON.parse(JSON.stringify(L));
+    out.stamps = Object.assign({}, L.stamps);
+    const rs = R.stamps || {};
+    for (const k of Object.keys(rs)) {
+      if ((rs[k] || 0) <= (out.stamps[k] || 0)) continue;
+      out.stamps[k] = rs[k];
+      if (k === 'cfg') { out.settings = Object.assign({}, out.settings, R.settings); continue; }
+      const p = k.slice(0, 2), id = k.slice(2);
+      const field = { 's:': 'schedule', 'l:': 'leaves', 'h:': 'holiOverride', 'c:': 'customHoli' }[p];
+      if (field) {
+        const src = R[field] || {};
+        out[field] = out[field] || {};
+        if (id in src) out[field][id] = src[id]; else delete out[field][id];
+      } else if (p === 'm:') {
+        const has = (R.months || []).includes(id);
+        out.months = out.months.filter(m => m !== id);
+        if (has) out.months.push(id);
+        out.months.sort();
+      }
+    }
+    return out;
+  }
+
+  return { pad, ymd, parse, addDays, mKeyOf, mIdx, mKey, mondayOf, md, mLabel, mShort,
+    assignMonth, weekMondaysOfMonth, makeWeek, buildWeeks, allocate, analyze, simulate, countDay, mergeStates };
+})();
+if (typeof module !== 'undefined') module.exports = Engine;
+</script>
+
+<!-- ============ 介面 ============ -->
+<header class="sticky top-0 z-30 bg-white/90 backdrop-blur border-b border-blue-100">
+  <div class="max-w-6xl mx-auto px-4 py-3 flex items-center gap-3">
+    <div class="w-10 h-10 rounded-xl bg-blue-600 text-white grid place-items-center font-bold text-lg shrink-0">傅</div>
+    <div class="min-w-0">
+      <h1 class="font-bold text-blue-900 leading-tight truncate text-base sm:text-lg">牙醫 PGY 診次與補休計算機</h1>
+      <p class="text-xs text-slate-500 truncate">傅醫師專用 · 今天 <span id="todayLabel"></span></p>
+    </div>
+    <div class="ml-auto flex gap-1.5 shrink-0">
+      <button id="syncBadge" class="px-2 py-1.5 rounded-lg text-xs border flex items-center gap-1"><span id="syncDot" class="w-2 h-2 rounded-full bg-slate-300"></span><span id="syncText" class="hidden sm:inline">未同步</span></button>
+      <button id="btnExport" class="px-2.5 py-1.5 rounded-lg text-xs sm:text-sm border border-blue-200 text-blue-700 hover:bg-blue-50">匯出</button>
+      <label class="px-2.5 py-1.5 rounded-lg text-xs sm:text-sm border border-blue-200 text-blue-700 hover:bg-blue-50 cursor-pointer">匯入<input id="fileImport" type="file" accept="application/json,.json" class="hidden"></label>
+      <button id="btnSettings" class="px-2.5 py-1.5 rounded-lg text-xs sm:text-sm bg-blue-600 text-white hover:bg-blue-700">設定</button>
+    </div>
+  </div>
+</header>
+
+<main class="max-w-6xl mx-auto px-4 py-4 space-y-5 pb-16">
+
+  <div id="iosHint" class="hidden rounded-xl bg-blue-600 text-white text-sm px-4 py-3 flex items-start gap-3">
+    <span>在 Safari 點「分享」→「加入主畫面」，就能像 App 一樣全螢幕開啟。</span>
+    <button id="iosHintClose" class="ml-auto font-bold">✕</button>
+  </div>
+
+  <!-- 設定 -->
+  <details id="settingsPanel" class="rounded-2xl bg-white border border-blue-100 shadow-sm">
+    <summary class="cursor-pointer px-4 py-3 font-semibold text-blue-900 flex items-center">⚙️ 設定（AI 金鑰／計算規則）<span class="ml-auto text-xs text-slate-400">點擊展開</span></summary>
+    <div class="px-4 pb-4 grid gap-4 md:grid-cols-2">
+      <div class="space-y-3">
+        <h3 class="text-sm font-semibold text-slate-700">AI 視覺辨識</h3>
+        <label class="block text-sm">使用服務
+          <select id="setProvider" class="mt-1 w-full rounded-lg border-slate-300 border px-3 py-2">
+            <option value="gemini">Google Gemini</option>
+            <option value="claude">Anthropic Claude</option>
+          </select>
+        </label>
+        <label class="block text-sm">Gemini API Key
+          <input id="setGeminiKey" type="password" autocomplete="off" class="mt-1 w-full rounded-lg border-slate-300 border px-3 py-2" placeholder="AIza...">
+        </label>
+        <label class="block text-sm">Gemini 模型
+          <input id="setGeminiModel" class="mt-1 w-full rounded-lg border-slate-300 border px-3 py-2">
+        </label>
+        <label class="block text-sm">Claude API Key
+          <input id="setClaudeKey" type="password" autocomplete="off" class="mt-1 w-full rounded-lg border-slate-300 border px-3 py-2" placeholder="sk-ant-...">
+        </label>
+        <label class="block text-sm">Claude 模型
+          <input id="setClaudeModel" class="mt-1 w-full rounded-lg border-slate-300 border px-3 py-2">
+        </label>
+        <p class="text-xs text-slate-500">金鑰只存在這台裝置的瀏覽器（localStorage），不會被匯出。</p>
+      </div>
+      <div class="space-y-3">
+        <h3 class="text-sm font-semibold text-slate-700">計算規則</h3>
+        <label class="block text-sm">辨識醫師姓氏
+          <input id="setDoctor" maxlength="2" class="mt-1 w-full rounded-lg border-slate-300 border px-3 py-2">
+        </label>
+        <label class="block text-sm">完整週低標（診）
+          <input id="setMin" type="number" min="0" max="18" class="mt-1 w-full rounded-lg border-slate-300 border px-3 py-2">
+        </label>
+        <label class="block text-sm">互補範圍（前後各幾個月，目前規定 1）
+          <input id="setWindow" type="number" min="0" max="6" class="mt-1 w-full rounded-lg border-slate-300 border px-3 py-2">
+        </label>
+        <label class="block text-sm">跨月週歸屬
+          <select id="setCross" class="mt-1 w-full rounded-lg border-slate-300 border px-3 py-2">
+            <option value="majority">天數較多的月份</option>
+            <option value="monday">週一所屬月份</option>
+          </select>
+        </label>
+        <div class="flex gap-2 pt-1">
+          <button id="btnSaveSettings" class="px-4 py-2 rounded-lg bg-blue-600 text-white text-sm">儲存設定</button>
+          <button id="btnReset" class="px-4 py-2 rounded-lg border border-red-200 text-red-600 text-sm">還原 11–12 月預設資料</button>
+        </div>
+      </div>
+      <div class="md:col-span-2 space-y-3 border-t border-slate-100 pt-4">
+        <h3 class="text-sm font-semibold text-slate-700">☁️ 跨裝置同步（GitHub 私密 Gist，與牙科申報記帳 App 相同做法）</h3>
+        <p class="text-xs text-slate-500">iPhone、iPad、電腦填同一組 Token 與 Gist ID；打開時自動抓最新資料，修改後自動上傳。可以直接用申報記帳 App 那一個 Gist，本 App 只會讀寫其中的 <span class="font-mono">pgy-schedule.json</span>，不會動到申報資料。兩台裝置改了不同日期會自動合併，同一格以較晚修改的為準。</p>
+        <div id="reuseLedger" class="hidden rounded-lg bg-blue-50 text-blue-800 text-sm px-3 py-2 flex flex-wrap items-center gap-2">
+          <span>偵測到這台裝置已設定「牙科申報記帳」的同步。</span>
+          <button id="btnReuseLedger" class="px-3 py-1 rounded-lg bg-blue-600 text-white text-xs">沿用同一組設定</button>
+        </div>
+        <div class="grid gap-3 md:grid-cols-2">
+          <label class="block text-sm">GitHub Token（只需勾選 gist 權限）
+            <input id="cloudToken" type="password" autocomplete="off" autocapitalize="off" spellcheck="false" class="mt-1 w-full rounded-lg border-slate-300 border px-3 py-2" placeholder="ghp_…">
+          </label>
+          <label class="block text-sm">Gist ID（可貼整段 Gist 網址）
+            <input id="cloudGist" autocomplete="off" autocapitalize="off" spellcheck="false" class="mt-1 w-full rounded-lg border-slate-300 border px-3 py-2" placeholder="例如 3f2a9c…">
+          </label>
+        </div>
+        <div class="flex flex-wrap gap-2 items-center">
+          <button id="cloudConnect" class="px-4 py-2 rounded-lg bg-blue-600 text-white text-sm">儲存並同步</button>
+          <button id="cloudSyncNow" class="px-4 py-2 rounded-lg border border-blue-200 text-blue-700 text-sm">立即同步</button>
+          <button id="cloudLink" class="px-4 py-2 rounded-lg border border-blue-200 text-blue-700 text-sm">複製同步連結</button>
+          <button id="cloudDisconnect" class="px-4 py-2 rounded-lg border border-slate-200 text-slate-600 text-sm">取消同步</button>
+          <span id="cloudStatus" class="text-xs text-slate-500"></span>
+        </div>
+        <textarea id="cloudLinkBox" readonly class="hidden w-full text-xs font-mono rounded-lg border border-slate-200 p-2" rows="2"></textarea>
+        <details class="text-xs text-slate-500"><summary class="cursor-pointer text-blue-700">第一次設定步驟</summary>
+          <ol class="list-decimal pl-5 mt-2 space-y-1">
+            <li>GitHub → 頭像 → Settings → Developer settings → Personal access tokens → Tokens (classic) → Generate new token，只勾 <b>gist</b>。</li>
+            <li>到 gist.github.com 建一個 secret gist（檔名 <span class="font-mono">pgy-schedule.json</span>、內容 <span class="font-mono">{}</span>），或直接沿用申報記帳 App 的 Gist。</li>
+            <li>在這裡貼上 Token 與 Gist ID，按「儲存並同步」。</li>
+            <li>其他裝置：按「複製同步連結」傳過去打開即可（申報記帳 App 產生的同步連結這裡也能用）。</li>
+          </ol>
+        </details>
+      </div>
+    </div>
+  </details>
+
+  <!-- 狀態卡 -->
+  <section id="cards" class="grid gap-3 md:grid-cols-3"></section>
+
+  <!-- 班表 -->
+  <section class="rounded-2xl bg-white border border-blue-100 shadow-sm">
+    <div class="px-4 pt-4 pb-3 flex flex-wrap items-center gap-2 border-b border-slate-100">
+      <h2 class="font-bold text-blue-900 mr-1">📅 班表</h2>
+      <div class="flex items-center gap-1">
+        <button id="prevMonth" class="w-8 h-8 rounded-lg border border-slate-200 hover:bg-slate-50">‹</button>
+        <span id="viewMonthLabel" class="font-semibold w-24 text-center tabnum"></span>
+        <button id="nextMonth" class="w-8 h-8 rounded-lg border border-slate-200 hover:bg-slate-50">›</button>
+      </div>
+      <button id="btnManage" class="px-3 py-1.5 rounded-lg text-sm"></button>
+      <div class="w-full sm:w-auto sm:ml-auto flex flex-wrap gap-2">
+        <label class="px-3 py-1.5 rounded-lg text-sm bg-blue-600 text-white cursor-pointer hover:bg-blue-700">📷 上傳班表辨識<input id="fileImage" type="file" accept="image/*" class="hidden"></label>
+        <button id="btnTemplate" class="px-3 py-1.5 rounded-lg text-sm border border-blue-200 text-blue-700 hover:bg-blue-50">套用預設班表</button>
+        <button id="btnClearMonth" class="px-3 py-1.5 rounded-lg text-sm border border-slate-200 text-slate-600 hover:bg-slate-50">清空本月</button>
+        <button id="btnUndo" class="hidden px-3 py-1.5 rounded-lg text-sm border border-amber-300 text-amber-700 bg-amber-50">復原上次辨識/套用</button>
+      </div>
+    </div>
+    <div id="aiStatus" class="hidden mx-4 mt-3 rounded-lg px-3 py-2 text-sm"></div>
+    <div class="px-4 pt-3 flex flex-wrap items-center gap-2 text-xs text-slate-500">
+      <span>列入計算的月份：</span><span id="monthChips" class="flex flex-wrap gap-1.5"></span>
+    </div>
+    <p class="px-4 pt-2 text-xs text-slate-500">點「早／午／晚」切換有無診；點日期可標記「假」。預設班表＝一午晚、二早午晚、三早午、五早午晚（每週 10 診）。</p>
+    <div id="grid" class="p-4 space-y-3"></div>
+  </section>
+
+  <!-- 國定假日 -->
+  <section class="rounded-2xl bg-white border border-blue-100 shadow-sm p-4">
+    <div class="flex flex-wrap items-center gap-3">
+      <h2 class="font-bold text-blue-900">🎌 國定假日</h2>
+      <label class="inline-flex items-center gap-2 text-sm cursor-pointer select-none">
+        <input id="holiMode" type="checkbox" class="w-5 h-5 accent-red-500">
+        <span>列入國定假日計算</span>
+      </label>
+      <label class="inline-flex items-center gap-1 text-sm">每天扣低標
+        <input id="holiCredit" type="number" min="0" max="3" class="w-14 rounded-lg border-slate-300 border px-2 py-1 tabnum">診</label>
+    </div>
+    <p id="holiExplain" class="mt-2 text-xs text-slate-500"></p>
+    <details class="mt-3">
+      <summary class="cursor-pointer text-sm text-blue-700">逐日勾選要列入的假日（2026/12–2028）</summary>
+      <div id="holiList" class="mt-3 grid gap-4 md:grid-cols-3 text-sm"></div>
+      <div class="mt-3 flex flex-wrap items-end gap-2 text-sm">
+        <label class="block">自訂假日日期<input id="holiAddDate" type="date" class="mt-1 block rounded-lg border-slate-300 border px-2 py-1.5"></label>
+        <label class="block">名稱<input id="holiAddName" class="mt-1 block w-36 rounded-lg border-slate-300 border px-2 py-1.5" placeholder="例：診所公休"></label>
+        <button id="holiAdd" class="px-3 py-1.5 rounded-lg bg-blue-600 text-white">新增</button>
+      </div>
+    </details>
+  </section>
+
+  <!-- 請假模擬器 -->
+  <section class="rounded-2xl bg-white border border-blue-100 shadow-sm p-4">
+    <h2 class="font-bold text-blue-900 mb-3">🧮 請假模擬器</h2>
+    <div class="grid gap-3 sm:grid-cols-3 items-end">
+      <label class="block text-sm">請假月份
+        <input id="simMonth" type="month" class="mt-1 w-full rounded-lg border-slate-300 border px-3 py-2">
+      </label>
+      <label class="block text-sm">預計請假診數
+        <div class="mt-1 flex gap-1.5">
+          <input id="simLeave" type="number" min="0" max="60" value="3" class="w-20 rounded-lg border-slate-300 border px-3 py-2 tabnum">
+          <button data-q="3" class="simQ px-3 rounded-lg border border-slate-200 text-sm">3</button>
+          <button data-q="6" class="simQ px-3 rounded-lg border border-slate-200 text-sm">6</button>
+          <button data-q="9" class="simQ px-3 rounded-lg border border-slate-200 text-sm">9</button>
+        </div>
+      </label>
+      <label class="flex items-center gap-2 text-sm pb-2">
+        <input id="simAssume" type="checkbox" checked class="w-4 h-4 accent-blue-600">未排班月份以預設班表推估
+      </label>
+    </div>
+    <div id="simResult" class="mt-4"></div>
+  </section>
+
+  <!-- 逐週明細 -->
+  <section class="rounded-2xl bg-white border border-blue-100 shadow-sm p-4">
+    <h2 class="font-bold text-blue-900 mb-3">🗂️ 逐週明細時間軸</h2>
+    <div id="timeline"></div>
+  </section>
+
+  <p class="text-xs text-slate-400 text-center">資料儲存在本機瀏覽器，換手機前請先「匯出」備份。</p>
+</main>
+
+<div id="toast" class="toast fixed left-1/2 -translate-x-1/2 bottom-6 z-50 px-4 py-2 rounded-xl bg-slate-900 text-white text-sm opacity-0 pointer-events-none"></div>
+
+<script>
+(() => {
+const E = Engine;
+const STORE = 'pgy_fu_state_v1', KEYSTORE = 'pgy_fu_keys_v1', HINT = 'pgy_fu_ioshint';
+const SLOTS = ['早', '午', '晚'];
+const WD = ['日', '一', '二', '三', '四', '五', '六'];
+const TEMPLATE = { 1: [0, 1, 1], 2: [1, 1, 1], 3: [1, 1, 0], 5: [1, 1, 1] };
+
+const DEFAULT_SCHEDULE = (() => {
+  const s = {}, N = '011', F = '111', A = '110';
+  [['2026-11-02', N], ['2026-11-03', F], ['2026-11-04', A], ['2026-11-06', F],
+   ['2026-11-09', F], ['2026-11-10', F], ['2026-11-11', A], ['2026-11-13', F],
+   ['2026-11-16', N], ['2026-11-17', F], ['2026-11-18', A], ['2026-11-20', F],
+   ['2026-11-23', N], ['2026-11-24', F], ['2026-11-25', A], ['2026-11-27', F],
+   ['2026-11-30', N], ['2026-12-01', F], ['2026-12-02', A], ['2026-12-04', F],
+   ['2026-12-07', N], ['2026-12-08', F], ['2026-12-09', A], ['2026-12-11', F],
+   ['2026-12-14', N], ['2026-12-15', F], ['2026-12-16', A],
+   ['2026-12-21', N], ['2026-12-22', F], ['2026-12-23', A], ['2026-12-25', F],
+   ['2026-12-28', N], ['2026-12-29', F], ['2026-12-30', A]
+  ].forEach(([d, c]) => { s[d] = [...c].map(Number); });
+  return s;
+})();
+
+// 國定假日（人事行政總處 116 年辦公日曆表；117 年尚未公告，依《紀念日及節日實施條例》與中央氣象署農曆推估）
+// [日期, 名稱, 預設列入(1/0), 推估(1)]；只列週一～週六。逢週六的節日已計入，對應的週五補假預設不重複計。
+const HOLIDAYS = [
+  ['2026-12-25', '行憲紀念日', 1],
+  ['2027-01-01', '開國紀念日', 1],
+  ['2027-02-04', '小年夜', 1], ['2027-02-05', '除夕', 1], ['2027-02-06', '春節初一', 1], ['2027-02-08', '春節初三', 1],
+  ['2027-02-09', '春節補假（初一逢週六）', 0], ['2027-02-10', '春節補假（初二逢週日）', 1],
+  ['2027-03-01', '和平紀念日補假', 1],
+  ['2027-04-05', '民族掃墓節', 1], ['2027-04-06', '兒童節補假', 1],
+  ['2027-04-30', '勞動節補假（5/1 逢週六）', 0], ['2027-05-01', '勞動節', 1],
+  ['2027-06-09', '端午節', 1], ['2027-09-15', '中秋節', 1], ['2027-09-28', '教師節', 1],
+  ['2027-10-11', '國慶日補假', 1], ['2027-10-25', '臺灣光復節', 1],
+  ['2027-12-24', '行憲紀念日補假（12/25 逢週六）', 0], ['2027-12-25', '行憲紀念日', 1],
+  ['2027-12-31', '元旦補假（1/1 逢週六）', 0], ['2028-01-01', '開國紀念日', 1],
+  ['2028-01-24', '小年夜', 1, 1], ['2028-01-25', '除夕', 1, 1], ['2028-01-26', '春節初一', 1, 1], ['2028-01-27', '春節初二', 1, 1], ['2028-01-28', '春節初三', 1, 1],
+  ['2028-02-28', '和平紀念日', 1, 1],
+  ['2028-04-03', '兒童節（與清明同日，提前）', 1, 1], ['2028-04-04', '民族掃墓節', 1, 1],
+  ['2028-05-01', '勞動節', 1, 1], ['2028-05-29', '端午節補假（5/28 逢週日）', 1, 1],
+  ['2028-09-28', '教師節', 1, 1], ['2028-10-03', '中秋節', 1, 1], ['2028-10-10', '國慶日', 1, 1],
+  ['2028-10-25', '臺灣光復節', 1, 1], ['2028-12-25', '行憲紀念日', 1, 1]
+];
+const HOLI_MAP = Object.fromEntries(HOLIDAYS.map(([d, n, def, est]) => [d, { n, def: !!def, est: !!est }]));
+
+const clone = o => JSON.parse(JSON.stringify(o));
+const defaultSettings = () => ({ doctor: '傅', minPerWeek: 9, window: 1, crossRule: 'majority', holidayMode: false, holidayCredit: 2 });
+const defaultState = () => ({
+  version: 2,
+  schedule: clone(DEFAULT_SCHEDULE),
+  leaves: { '2026-12-18': 1 },
+  months: ['2026-11', '2026-12'],
+  settings: defaultSettings(),
+  holiOverride: {}, customHoli: {}, stamps: {}
+});
+const defaultKeys = () => ({ provider: 'gemini', geminiKey: '', claudeKey: '', geminiModel: 'gemini-2.5-flash', claudeModel: 'claude-sonnet-5-5' });
+
+function normalize(s) {
+  const d = defaultState();
+  const out = Object.assign(d, s);
+  out.leaves = s.leaves || {}; out.holiOverride = s.holiOverride || {}; out.customHoli = s.customHoli || {}; out.stamps = s.stamps || {};
+  out.settings = Object.assign(defaultSettings(), s.settings);
+  if (!s.version || s.version < 2) out.settings.window = 1; // 新規定：只能用前後一個月互補
+  out.version = 2;
+  return out;
+}
+function load() {
+  try {
+    const s = JSON.parse(localStorage.getItem(STORE));
+    if (s && s.schedule && s.months) return normalize(s);
+  } catch (e) {}
+  return defaultState();
+}
+function loadKeys() { try { return Object.assign(defaultKeys(), JSON.parse(localStorage.getItem(KEYSTORE)) || {}); } catch (e) { return defaultKeys(); } }
+let state = load(), keys = loadKeys(), undoSnap = null;
+const save = () => { try { localStorage.setItem(STORE, JSON.stringify(state)); } catch (e) {} scheduleSync(); };
+
+// ---- 所有修改都經過這些函式，留下時間戳供跨裝置合併 ----
+const stamp = k => { state.stamps[k] = Date.now(); };
+function setDay(ds, v) { if (v && v.some(Boolean)) state.schedule[ds] = v.map(Number); else delete state.schedule[ds]; stamp('s:' + ds); }
+function setLeave(ds, on) { if (on) state.leaves[ds] = 1; else delete state.leaves[ds]; stamp('l:' + ds); }
+function setManaged(k, on) {
+  state.months = state.months.filter(m => m !== k);
+  if (on) state.months.push(k);
+  state.months.sort(); stamp('m:' + k);
+}
+function stampAll(prev) {
+  const keysOf = s => [
+    ...Object.keys(s.schedule || {}).map(k => 's:' + k), ...Object.keys(s.leaves || {}).map(k => 'l:' + k),
+    ...Object.keys(s.holiOverride || {}).map(k => 'h:' + k), ...Object.keys(s.customHoli || {}).map(k => 'c:' + k),
+    ...(s.months || []).map(k => 'm:' + k), 'cfg'];
+  const t = Date.now();
+  new Set([...keysOf(prev), ...keysOf(state)]).forEach(k => { state.stamps[k] = t; });
+}
+
+// ---- 國定假日 ----
+const allHoliDates = () => [...new Set([...Object.keys(HOLI_MAP), ...Object.keys(state.customHoli)])].sort();
+const holiName = ds => state.customHoli[ds] || (HOLI_MAP[ds] && HOLI_MAP[ds].n) || '';
+function holiIncluded(ds) {
+  if (ds in state.holiOverride) return !!state.holiOverride[ds];
+  if (state.customHoli[ds]) return true;
+  return !!(HOLI_MAP[ds] && HOLI_MAP[ds].def);
+}
+function optFor(mode) {
+  const s = state.settings;
+  const set = mode ? new Set(allHoliDates().filter(ds => holiIncluded(ds) && E.parse(ds).getDay() !== 0)) : null;
+  return Object.assign({}, s, { holidays: set });
+}
+const saveKeys = () => { try { localStorage.setItem(KEYSTORE, JSON.stringify(keys)); } catch (e) {} };
+
+const qp = new URLSearchParams(location.search).get('today');
+const TODAY = qp ? E.parse(qp) : (() => { const d = new Date(); return new Date(d.getFullYear(), d.getMonth(), d.getDate()); })();
+const TODAY_S = E.ymd(TODAY), TI = E.mIdx(E.mKeyOf(TODAY));
+let viewMonth = E.mKeyOf(TODAY);
+
+const $ = id => document.getElementById(id);
+const opt = () => optFor(state.settings.holidayMode);
+const expiryLabel = mi => `${E.mLabel(E.mKey(mi))}底`;
+const signed = n => (n > 0 ? `+${n}` : `${n}`);
+const netCls = n => (n > 0 ? 'text-emerald-600' : n < 0 ? 'text-red-600' : 'text-slate-500');
+const range = w => `${E.md(w.start)}–${E.md(w.end)}`;
+
+function toast(msg) {
+  const t = $('toast'); t.textContent = msg; t.style.opacity = 1;
+  clearTimeout(toast._t); toast._t = setTimeout(() => (t.style.opacity = 0), 2200);
+}
+
+function weekStatus(w) {
+  if (w.end < TODAY_S) return ['已結束', 'bg-slate-100 text-slate-600'];
+  if (w.start <= TODAY_S) return ['進行中', 'bg-blue-100 text-blue-700'];
+  return ['預排', 'bg-amber-50 text-amber-700'];
+}
+function ensureManaged(k) { if (!state.months.includes(k)) setManaged(k, true); }
+
+// ---------- 狀態卡 ----------
+function renderCards(a, alt) {
+  const open = a.deficitOpen;
+  const thisMon = E.ymd(E.mondayOf(TODAY));
+  const cur = a.weeks.find(w => w.id === thisMon) || (TODAY.getDay() === 0 ? null : E.makeWeek(state.schedule, E.mondayOf(TODAY), opt()));
+
+  // 可用盈餘分組：非跨月週依月份合併，跨月週單獨列出
+  const groups = {};
+  a.sur.filter(s => s.remaining > 0 && !s.expired).forEach(s => {
+    const k = s.week.cross ? 'x' + s.week.id : 'm' + s.week.month;
+    if (!groups[k]) groups[k] = { label: s.week.cross ? `跨月週 ${range(s.week)}（歸${E.mShort(s.week.month)}）` : `${E.mShort(s.week.month)}盈餘`, n: 0, expiry: s.expiry, mi: s.mi, id: s.week.id };
+    groups[k].n += s.remaining;
+  });
+  const gl = Object.values(groups).sort((x, y) => x.mi - y.mi || (x.id < y.id ? -1 : 1));
+
+  $('cards').innerHTML = `
+    <div class="rounded-2xl p-4 border shadow-sm ${open ? 'bg-red-50 border-red-200' : 'bg-white border-emerald-200'}">
+      <p class="text-sm text-slate-500">目前累計缺診數</p>
+      <p class="mt-1 text-3xl font-bold tabnum ${open ? 'text-red-600' : 'text-emerald-600'}">${open} 診${open ? '' : '<span class="text-lg">（安全）</span>'}</p>
+      <p class="mt-2 text-xs text-slate-500">${open
+        ? `其中 ${a.deficitHard} 診已超過互補期限無法補；${open - a.deficitHard} 診需靠後續月份盈餘補平。`
+        : `所有缺口皆已配對補平（總缺口 ${a.totalDeficit} 診、總盈餘 ${a.totalSurplus} 診）。`}</p>
+    </div>
+    <div class="rounded-2xl p-4 bg-white border border-blue-200 shadow-sm">
+      <p class="text-sm text-slate-500">目前可用盈餘（尚可請假額度）</p>
+      <p class="mt-1 text-3xl font-bold tabnum text-blue-700">+${a.available} 診</p>
+      <ul class="mt-2 space-y-1 text-xs">${gl.length ? gl.map(g => `<li class="flex justify-between gap-2"><span>${g.label} <b class="text-emerald-600">+${g.n}</b> 診</span><span class="text-slate-500 shrink-0">可用至 ${expiryLabel(g.expiry)}</span></li>`).join('') : '<li class="text-slate-400">目前沒有可用盈餘</li>'}</ul>
+      <p class="mt-2 text-[11px] text-slate-400">含已排定的未來週；扣除已用於補缺口的部分。</p>
+      <div class="mt-2 rounded-lg ${state.settings.holidayMode ? 'bg-red-50 text-red-700' : 'bg-slate-50 text-slate-600'} px-2 py-1.5 text-xs">
+        🎌 目前${state.settings.holidayMode ? '<b>已列入</b>' : '<b>未列入</b>'}國定假日。若${state.settings.holidayMode ? '不列入' : '列入'}：可用 <b>+${alt.available}</b>、缺 <b>${alt.deficitOpen}</b> 診
+      </div>
+    </div>
+    <div class="rounded-2xl p-4 bg-white border border-slate-200 shadow-sm">
+      <p class="text-sm text-slate-500">本週狀態</p>
+      ${cur ? `<p class="mt-1 text-lg font-semibold">${range(cur)}</p>
+        <p class="tabnum">已排 <b>${cur.actual}</b> 診 · 淨額 <b class="${netCls(cur.net)}">${signed(cur.net)}</b></p>` : '<p class="mt-1 text-slate-400">今天是週日</p>'}
+      <p class="mt-3 text-sm text-slate-500">已過期失效盈餘</p>
+      <p class="text-xl font-bold tabnum ${a.expired ? 'text-slate-500 line-through' : 'text-slate-300'}">${a.expired} 診</p>
+    </div>`;
+}
+
+// ---------- 班表網格 ----------
+function renderGrid() {
+  $('viewMonthLabel').textContent = E.mLabel(viewMonth);
+  const managed = state.months.includes(viewMonth);
+  const bm = $('btnManage');
+  bm.textContent = managed ? '✓ 已列入計算' : '＋ 列入計算';
+  bm.className = 'px-3 py-1.5 rounded-lg text-sm ' + (managed ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-amber-50 text-amber-700 border border-amber-300');
+
+  $('monthChips').innerHTML = state.months.length ? state.months.map(k => `<span class="inline-flex items-center gap-1 rounded-full bg-blue-50 text-blue-700 px-2 py-0.5">${E.mLabel(k)}<button data-rm="${k}" class="text-blue-400 hover:text-red-500">✕</button></span>`).join('') : '<span class="text-slate-400">（尚無）</span>';
+
+  const o = opt(), hmode = state.settings.holidayMode;
+  const html = E.weekMondaysOfMonth(viewMonth).map(mon => {
+    const w = E.makeWeek(state.schedule, mon, o);
+    const holDays = w.days.filter(ds => holiName(ds));
+    const counted = state.months.includes(w.month);
+    const badges = [
+      `<span class="rounded-full px-2 py-0.5 text-[11px] ${w.month === viewMonth ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-600'}">歸 ${E.mShort(w.month)}</span>`,
+      w.cross ? '<span class="rounded-full px-2 py-0.5 text-[11px] bg-violet-100 text-violet-700">跨月週</span>' : '',
+      counted ? '' : '<span class="rounded-full px-2 py-0.5 text-[11px] bg-amber-100 text-amber-700">未列入計算</span>'
+    ].join('');
+    const days = w.days.map((ds, i) => {
+      const d = E.parse(ds), inMonth = E.mKeyOf(d) === viewMonth;
+      const v = state.schedule[ds] || [0, 0, 0], leave = state.leaves[ds], isToday = ds === TODAY_S;
+      const hn = holiName(ds), hon = hn && hmode && holiIncluded(ds);
+      return `<div class="flex flex-col items-center gap-1 ${inMonth ? '' : 'opacity-55'}">
+        <button data-leave="${ds}" title="${hn}" class="w-full text-[11px] leading-tight rounded-md py-0.5 ${isToday ? 'bg-blue-600 text-white' : hn ? (hon ? 'bg-red-50 text-red-600' : 'text-red-400') : 'text-slate-600'}">
+          <span class="tabnum">${E.md(d)}</span><br>${WD[d.getDay()]}${hn ? ' 🎌' : ''}${leave ? ' <span class="text-red-500 font-bold">假</span>' : ''}
+        </button>
+        ${SLOTS.map((s, j) => `<button data-date="${ds}" data-slot="${j}" class="slot w-full h-8 sm:h-9 rounded-md border text-xs font-medium ${v[j] ? 'slot-on' : 'slot-off'}">${s}</button>`).join('')}
+      </div>`;
+    }).join('');
+    return `<div class="rounded-xl border ${w.cross ? 'border-violet-200' : 'border-slate-200'} overflow-hidden">
+      <div class="flex flex-wrap items-center gap-1.5 px-3 py-2 bg-slate-50 text-sm">
+        <span class="font-semibold tabnum">${E.md(w.start)}（一）–${E.md(w.end)}（六）</span>${badges}
+        <span class="ml-auto tabnum">實上 <b>${w.actual}</b>${w.min !== o.minPerWeek ? ` / 低標 <b class="text-red-600">${w.min}</b>` : ''} · 淨額 <b class="${netCls(w.net)}">${signed(w.net)}</b></span>
+      </div>
+      ${holDays.length ? `<div class="px-3 pt-1.5 text-[11px] text-red-600">🎌 ${holDays.map(ds => `${E.md(ds)} ${holiName(ds)}${hmode && !holiIncluded(ds) ? '（未勾選）' : ''}`).join('、')}${hmode ? '' : '（目前未列入計算）'}</div>` : ''}
+      <div class="grid grid-cols-6 gap-1 sm:gap-2 p-2">${days}</div>
+    </div>`;
+  }).join('');
+  $('grid').innerHTML = html;
+  $('btnUndo').classList.toggle('hidden', !undoSnap);
+}
+
+// ---------- 模擬器 ----------
+function renderSim() {
+  const target = $('simMonth').value;
+  if (!/^\d{4}-\d{2}$/.test(target)) { $('simResult').innerHTML = ''; return; }
+  const L = Math.max(0, parseInt($('simLeave').value, 10) || 0);
+  const assume = $('simAssume').checked;
+  const r = E.simulate(state.schedule, state.months, opt(), target, L, assume, TEMPLATE);
+  const managed = state.months.includes(target);
+  const head = r.need > 0
+    ? `<div class="rounded-xl bg-red-50 border border-red-200 p-4"><p class="text-sm text-red-700">${E.mLabel(target)}請 ${L} 診</p><p class="text-2xl font-bold text-red-600 tabnum">還需額外多上 ${r.need} 診</p><p class="text-sm text-red-700 mt-1">該月最多可請 ${r.max} 診而不產生缺口。</p></div>`
+    : `<div class="rounded-xl bg-emerald-50 border border-emerald-200 p-4"><p class="text-sm text-emerald-700">${E.mLabel(target)}請 ${L} 診</p><p class="text-2xl font-bold text-emerald-600 tabnum">可完全抵銷，還剩 ${r.left} 診可請</p><p class="text-sm text-emerald-700 mt-1">該月最多可請 ${r.max} 診。</p></div>`;
+  const weeks = r.monthWeeks.map(w => `<li class="flex justify-between tabnum"><span>${range(w)}${w.cross ? ' <span class="text-violet-600">跨月</span>' : ''}${r.added.includes(w.month) ? ' <span class="text-amber-600">推估</span>' : ''}</span><span>${w.actual} 診 <b class="${netCls(w.net)}">${signed(w.net)}</b></span></li>`).join('') || '<li class="text-slate-400">該月尚無週資料（可勾選推估）</li>';
+  const src = r.sources.map(s => `<li class="flex justify-between tabnum"><span>${range(s.week)} 週（${E.mShort(s.week.month)}${r.added.includes(s.week.month) ? '・推估' : ''}）</span><span><b class="text-emerald-600">+${s.remaining}</b> · 至${expiryLabel(s.expiry)}</span></li>`).join('') || '<li class="text-slate-400">無</li>';
+  const fills = r.fills.map(f => `<li>由 ${range(f.s.week)} 週（${E.mShort(f.s.week.month)}）補 ${f.n} 診</li>`).join('');
+  $('simResult').innerHTML = `${head}
+    <div class="grid gap-3 md:grid-cols-3 mt-3 text-sm">
+      <div class="rounded-xl border border-slate-200 p-3"><p class="font-semibold mb-1">${E.mShort(target)}各週${managed ? '' : (assume ? '（預設班表推估）' : '')}</p><ul class="space-y-0.5">${weeks}</ul></div>
+      <div class="rounded-xl border border-slate-200 p-3"><p class="font-semibold mb-1">可用於${E.mShort(target)}的盈餘（請假前）</p><ul class="space-y-0.5">${src}</ul></div>
+      <div class="rounded-xl border border-slate-200 p-3"><p class="font-semibold mb-1">這次請假的抵銷來源</p><ul class="space-y-0.5">${fills || '<li class="text-slate-400">—</li>'}</ul>
+        ${r.need > 0 ? `<p class="mt-1 text-red-600">不足 ${r.need} 診</p>` : ''}</div>
+    </div>
+    <p class="mt-2 text-xs text-slate-400">假設請假造成的缺口落在${E.mShort(target)}，依「最舊盈餘優先」與其他缺口一起重新配對；${assume ? `未列入計算的月份（${r.added.map(E.mShort).join('、') || '無'}）以每週 10 診推估。` : '未排班月份不推估。'}</p>`;
+}
+
+// ---------- 逐週明細 ----------
+function renderTimeline(a) {
+  if (!a.weeks.length) { $('timeline').innerHTML = '<p class="text-slate-400 text-sm">尚無列入計算的月份。</p>'; return; }
+  const surBy = new Map(a.sur.map(s => [s.week.id, s]));
+  const defBy = new Map(a.defs.filter(d => d.week).map(d => [d.week.id, d]));
+  let lastMonth = null;
+  const rows = a.weeks.map(w => {
+    const [st, stc] = weekStatus(w);
+    let desc = '—', rem = '—';
+    const s = surBy.get(w.id), d = defBy.get(w.id);
+    if (d) {
+      const parts = d.fills.map(f => `由 ${E.md(f.s.week.start)} 週（${E.mShort(f.s.week.month)}）盈餘補 ${f.n} 診`);
+      if (d.unfilled) parts.push(`<span class="text-red-600 font-semibold">尚缺 ${d.unfilled} 診${d.hard ? '（已逾期無法補）' : '（待後續盈餘）'}</span>`);
+      desc = parts.join('<br>');
+      rem = d.unfilled ? `<span class="text-red-600">缺 ${d.unfilled}</span>` : '<span class="text-emerald-600">已補平</span>';
+    } else if (s) {
+      desc = s.uses.length ? s.uses.map(u => `補 ${E.md(u.d.week.start)} 週 ${u.n} 診`).join('<br>') : '尚未動用';
+      rem = s.remaining
+        ? (s.expired ? `<span class="text-slate-400 line-through">+${s.remaining}</span> <span class="text-slate-400">已過期</span>` : `<b class="text-emerald-600">+${s.remaining}</b> <span class="text-slate-500 text-xs">至${expiryLabel(s.expiry)}</span>`)
+        : '<span class="text-slate-400">已用完</span>';
+    }
+    const sep = w.month !== lastMonth;
+    lastMonth = w.month;
+    const act = `${w.actual}${w.min !== opt().minPerWeek ? `<span class="text-red-500 text-xs">/低標${w.min}🎌</span>` : ''}`;
+    return { w, st, stc, desc, rem, sep, act };
+  });
+
+  const table = `<div class="hidden md:block overflow-x-auto"><table class="w-full text-sm">
+    <thead><tr class="text-left text-slate-500 border-b"><th class="py-2 pr-2">週次（一～六）</th><th class="pr-2">歸屬</th><th class="pr-2">狀態</th><th class="pr-2 text-right">實上</th><th class="pr-2 text-right">淨額</th><th class="pr-2">自動抵銷說明</th><th class="text-right">剩餘可用盈餘</th></tr></thead>
+    <tbody>${rows.map(r => `${r.sep ? `<tr><td colspan="7" class="pt-3 pb-1 text-xs font-semibold text-blue-700">${E.mLabel(r.w.month)}</td></tr>` : ''}
+      <tr class="border-b border-slate-100 align-top">
+        <td class="py-2 pr-2 tabnum">${range(r.w)}${r.w.cross ? ' <span class="text-[11px] rounded-full bg-violet-100 text-violet-700 px-1.5">跨月</span>' : ''}</td>
+        <td class="py-2 pr-2">${E.mShort(r.w.month)}</td>
+        <td class="py-2 pr-2"><span class="rounded-full px-2 py-0.5 text-[11px] ${r.stc}">${r.st}</span></td>
+        <td class="py-2 pr-2 text-right tabnum whitespace-nowrap">${r.act}</td>
+        <td class="py-2 pr-2 text-right tabnum font-bold ${netCls(r.w.net)}">${signed(r.w.net)}</td>
+        <td class="py-2 pr-2 text-slate-600">${r.desc}</td>
+        <td class="py-2 text-right tabnum whitespace-nowrap">${r.rem}</td></tr>`).join('')}
+    </tbody>
+    <tfoot><tr class="font-semibold"><td class="pt-3" colspan="3">合計</td><td class="pt-3 text-right tabnum">${a.weeks.reduce((x, w) => x + w.actual, 0)}</td><td class="pt-3 text-right tabnum">${signed(a.totalSurplus - a.totalDeficit)}</td><td class="pt-3"></td><td class="pt-3 text-right tabnum text-blue-700">+${a.available}</td></tr></tfoot>
+  </table></div>`;
+
+  const cards = `<div class="md:hidden space-y-2">${rows.map(r => `${r.sep ? `<p class="pt-2 text-xs font-semibold text-blue-700">${E.mLabel(r.w.month)}</p>` : ''}
+    <div class="rounded-xl border ${r.w.cross ? 'border-violet-200' : 'border-slate-200'} p-3 text-sm">
+      <div class="flex items-center gap-2"><span class="font-semibold tabnum">${range(r.w)}</span>${r.w.cross ? '<span class="text-[11px] rounded-full bg-violet-100 text-violet-700 px-1.5">跨月</span>' : ''}<span class="rounded-full px-2 py-0.5 text-[11px] ${r.stc}">${r.st}</span>
+        <span class="ml-auto tabnum">${r.act} 診 <b class="${netCls(r.w.net)}">${signed(r.w.net)}</b></span></div>
+      <div class="mt-1 flex gap-2 text-xs"><div class="text-slate-600 flex-1">${r.desc}</div><div class="text-right tabnum">${r.rem}</div></div>
+    </div>`).join('')}
+    <div class="rounded-xl bg-blue-50 p-3 text-sm flex justify-between font-semibold"><span>合計淨額 ${signed(a.totalSurplus - a.totalDeficit)}</span><span class="text-blue-700">剩餘可用 +${a.available}</span></div></div>`;
+
+  $('timeline').innerHTML = table + cards;
+}
+
+function render() {
+  const a = E.analyze(state.schedule, state.months, opt(), TODAY);
+  const alt = E.analyze(state.schedule, state.months, optFor(!state.settings.holidayMode), TODAY);
+  renderCards(a, alt); renderGrid(); renderHolidays(); renderSim(); renderTimeline(a);
+}
+
+// ---------- 事件：網格 ----------
+$('grid').addEventListener('click', e => {
+  const b = e.target.closest('button');
+  if (!b) return;
+  if (b.dataset.date) {
+    const ds = b.dataset.date, j = +b.dataset.slot;
+    const v = state.schedule[ds] ? [...state.schedule[ds]] : [0, 0, 0];
+    v[j] = v[j] ? 0 : 1;
+    setDay(ds, v);
+    ensureManaged(E.assignMonth(E.mondayOf(E.parse(ds)), opt().crossRule));
+    save(); render();
+  } else if (b.dataset.leave) {
+    const ds = b.dataset.leave;
+    setLeave(ds, !state.leaves[ds]);
+    save(); render();
+  }
+});
+$('monthChips').addEventListener('click', e => {
+  const k = e.target.closest('[data-rm]')?.dataset.rm;
+  if (!k) return;
+  if (!confirm(`將 ${E.mLabel(k)} 移出計算？（班表資料會保留）`)) return;
+  setManaged(k, false); save(); render();
+});
+const shiftMonth = n => { viewMonth = E.mKey(E.mIdx(viewMonth) + n); renderGrid(); };
+$('prevMonth').onclick = () => shiftMonth(-1);
+$('nextMonth').onclick = () => shiftMonth(1);
+$('btnManage').onclick = () => {
+  if (state.months.includes(viewMonth)) {
+    if (!confirm(`將 ${E.mLabel(viewMonth)} 移出計算？（班表資料會保留）`)) return;
+    setManaged(viewMonth, false);
+  } else ensureManaged(viewMonth);
+  save(); render();
+};
+function weeksOwnedByView() {
+  return E.weekMondaysOfMonth(viewMonth).filter(mon => E.assignMonth(mon, opt().crossRule) === viewMonth);
+}
+$('btnTemplate').onclick = () => {
+  const hs = opt().holidays;
+  if (!confirm(`將「一午晚、二早午晚、三早午、五早午晚」套用到歸屬 ${E.mLabel(viewMonth)} 的每一週？（會覆蓋這些週的現有排班${hs ? '；已勾選的國定假日不排診' : ''}）`)) return;
+  undoSnap = clone(state.schedule);
+  weeksOwnedByView().forEach(mon => {
+    for (let i = 0; i < 6; i++) {
+      const d = E.addDays(mon, i), ds = E.ymd(d), t = TEMPLATE[d.getDay()];
+      setDay(ds, t && !(hs && hs.has(ds)) ? t : null);
+    }
+  });
+  ensureManaged(viewMonth); save(); render(); toast('已套用預設班表');
+};
+$('btnClearMonth').onclick = () => {
+  if (!confirm(`清空歸屬 ${E.mLabel(viewMonth)} 各週的所有診次？`)) return;
+  undoSnap = clone(state.schedule);
+  weeksOwnedByView().forEach(mon => { for (let i = 0; i < 6; i++) setDay(E.ymd(E.addDays(mon, i)), null); });
+  save(); render(); toast('已清空');
+};
+$('btnUndo').onclick = () => {
+  if (!undoSnap) return;
+  new Set([...Object.keys(undoSnap), ...Object.keys(state.schedule)]).forEach(ds => {
+    if (JSON.stringify(undoSnap[ds]) !== JSON.stringify(state.schedule[ds])) setDay(ds, undoSnap[ds]);
+  });
+  undoSnap = null; save(); render(); toast('已復原');
+};
+
+// ---------- AI 辨識 ----------
+function aiMsg(html, kind) {
+  const el = $('aiStatus');
+  el.className = 'mx-4 mt-3 rounded-lg px-3 py-2 text-sm ' + ({ info: 'bg-blue-50 text-blue-800', ok: 'bg-emerald-50 text-emerald-800', err: 'bg-red-50 text-red-700' }[kind]);
+  el.innerHTML = html;
+}
+function imageToJpeg(file, max = 2000) {
+  return new Promise((res, rej) => {
+    const url = URL.createObjectURL(file), img = new Image();
+    img.onload = () => {
+      const sc = Math.min(1, max / Math.max(img.width, img.height));
+      const c = document.createElement('canvas');
+      c.width = Math.round(img.width * sc); c.height = Math.round(img.height * sc);
+      const g = c.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, c.width, c.height); g.drawImage(img, 0, 0, c.width, c.height);
+      URL.revokeObjectURL(url);
+      res(c.toDataURL('image/jpeg', 0.92).split(',')[1]);
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); rej(new Error('無法讀取圖片')); };
+    img.src = url;
+  });
+}
+function buildPrompt(key) {
+  const [y, m] = key.split('-').map(Number), doc = opt().doctor || '傅';
+  return `這是一張「西盛醫生班表」月曆表格圖片，主要月份為 ${y} 年 ${m} 月。
+表格的直欄是星期一到星期六；每一週有「早、午、晚」三列，每格內寫著該時段看診醫師的姓氏（例如「高林譚杜傅」）。
+請逐一檢查表上出現的每一個日期（包含表格中出現的上個月或下個月日期），判斷該日早、午、晚三格內是否包含「${doc}」字。
+跨年時請正確推算年份（例如 ${m === 12 ? `${y + 1} 年 1 月` : m === 1 ? `${y - 1} 年 12 月` : '相鄰月份'}）。
+只輸出 JSON，不要任何說明文字或 markdown，格式如下：
+{"days":[{"date":"YYYY-MM-DD","early":true,"noon":false,"night":true}]}
+表上沒有出現的日期不要列出；星期日不要列出。`;
+}
+async function callGemini(b64, prompt) {
+  if (!keys.geminiKey) throw new Error('請先在「設定」輸入 Gemini API Key');
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(keys.geminiModel)}:generateContent?key=${encodeURIComponent(keys.geminiKey)}`;
+  const r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({
+    contents: [{ parts: [{ text: prompt }, { inline_data: { mime_type: 'image/jpeg', data: b64 } }] }],
+    generationConfig: { temperature: 0, responseMimeType: 'application/json' }
+  }) });
+  const j = await r.json();
+  if (!r.ok) throw new Error(j.error?.message || `Gemini 錯誤 ${r.status}`);
+  return (j.candidates?.[0]?.content?.parts || []).map(p => p.text || '').join('');
+}
+async function callClaude(b64, prompt) {
+  if (!keys.claudeKey) throw new Error('請先在「設定」輸入 Claude API Key');
+  const r = await fetch('https://api.anthropic.com/v1/messages', { method: 'POST', headers: {
+    'content-type': 'application/json', 'x-api-key': keys.claudeKey, 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true'
+  }, body: JSON.stringify({ model: keys.claudeModel, max_tokens: 8000, messages: [{ role: 'user', content: [
+    { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: b64 } }, { type: 'text', text: prompt }] }] }) });
+  const j = await r.json();
+  if (!r.ok) throw new Error(j.error?.message || `Claude 錯誤 ${r.status}`);
+  return (j.content || []).filter(c => c.type === 'text').map(c => c.text).join('');
+}
+function parseAI(text) {
+  const a = text.indexOf('{'), b = text.lastIndexOf('}');
+  if (a < 0 || b < a) throw new Error('AI 回傳內容不是 JSON');
+  const j = JSON.parse(text.slice(a, b + 1));
+  const days = Array.isArray(j) ? j : j.days;
+  if (!Array.isArray(days)) throw new Error('JSON 缺少 days 陣列');
+  const pick = (o, ks) => ks.some(k => o[k] === true || o[k] === 1 || o[k] === '1' || o[k] === 'true');
+  return days.filter(d => /^\d{4}-\d{2}-\d{2}$/.test(d.date || '') && E.parse(d.date).getDay() !== 0)
+    .map(d => ({ date: d.date, v: [pick(d, ['early', 'morning', '早']), pick(d, ['noon', 'afternoon', '午']), pick(d, ['night', 'evening', '晚'])].map(Number) }));
+}
+$('fileImage').addEventListener('change', async e => {
+  const file = e.target.files[0]; e.target.value = '';
+  if (!file) return;
+  const month = viewMonth;
+  aiMsg(`⏳ 正在用 ${keys.provider === 'claude' ? 'Claude' : 'Gemini'} 辨識 ${E.mLabel(month)} 班表…`, 'info');
+  try {
+    const b64 = await imageToJpeg(file);
+    const prompt = buildPrompt(month);
+    const text = keys.provider === 'claude' ? await callClaude(b64, prompt) : await callGemini(b64, prompt);
+    const days = parseAI(text);
+    if (!days.length) throw new Error('沒有辨識到任何日期');
+    undoSnap = clone(state.schedule);
+    let total = 0;
+    days.forEach(({ date, v }) => { total += v.filter(Boolean).length; setDay(date, v); });
+    ensureManaged(month); save(); render();
+    aiMsg(`✅ 辨識完成：${days.length} 天、共 ${total} 診已填入（${E.md(days[0].date)}～${E.md(days[days.length - 1].date)}）。請核對下方網格，有誤直接點格子修正；不滿意可按「復原」。`, 'ok');
+  } catch (err) {
+    aiMsg(`❌ ${err.message}`, 'err');
+  }
+});
+
+// ---------- 國定假日 ----------
+function renderHolidays() {
+  const s = state.settings;
+  $('holiMode').checked = !!s.holidayMode;
+  $('holiCredit').value = s.holidayCredit;
+  $('holiExplain').innerHTML = s.holidayMode
+    ? `已列入：每個勾選的國定假日（週一～週六）讓該週低標減少 ${s.holidayCredit} 診。沒上班＝該週不會因此出現缺口；有上班＝那天的診數照算，等於多出 ${s.holidayCredit} 診盈餘。`
+    : '未列入：國定假日當一般工作日計算（每週低標固定 ' + s.minPerWeek + ' 診）。規定確定前可以隨時切換比較，上方卡片會顯示兩種算法的差異。';
+  const byYear = {};
+  allHoliDates().forEach(ds => (byYear[ds.slice(0, 4)] = byYear[ds.slice(0, 4)] || []).push(ds));
+  $('holiList').innerHTML = Object.keys(byYear).sort().map(y => `<div>
+    <p class="font-semibold text-slate-700 mb-1">${y} 年${y === '2028' ? ' <span class="text-xs font-normal text-amber-600">（推估，官方尚未公告）</span>' : ''}</p>
+    <ul class="space-y-1">${byYear[y].map(ds => {
+      const d = E.parse(ds), h = HOLI_MAP[ds], custom = !!state.customHoli[ds];
+      return `<li class="flex items-center gap-2">
+        <input type="checkbox" data-holi="${ds}" ${holiIncluded(ds) ? 'checked' : ''} class="w-4 h-4 accent-red-500">
+        <span class="tabnum w-20 shrink-0">${E.md(d)}（${WD[d.getDay()]}）</span>
+        <span class="flex-1 ${holiIncluded(ds) ? '' : 'text-slate-400'}">${holiName(ds)}${custom ? ' <span class="text-xs text-blue-600">自訂</span>' : ''}</span>
+        ${custom ? `<button data-holirm="${ds}" class="text-slate-400 hover:text-red-500 text-xs">✕</button>` : ''}
+      </li>`;
+    }).join('')}</ul></div>`).join('');
+}
+$('holiMode').addEventListener('change', e => { state.settings.holidayMode = e.target.checked; stamp('cfg'); save(); render(); toast(e.target.checked ? '已列入國定假日計算' : '已改為不列入國定假日'); });
+$('holiCredit').addEventListener('change', e => { state.settings.holidayCredit = Math.max(0, Math.min(3, +e.target.value || 0)); stamp('cfg'); save(); render(); });
+$('holiList').addEventListener('click', e => {
+  const cb = e.target.closest('[data-holi]');
+  if (cb) { state.holiOverride[cb.dataset.holi] = cb.checked; stamp('h:' + cb.dataset.holi); save(); render(); return; }
+  const rm = e.target.closest('[data-holirm]');
+  if (rm) { const ds = rm.dataset.holirm; delete state.customHoli[ds]; delete state.holiOverride[ds]; stamp('c:' + ds); stamp('h:' + ds); save(); render(); }
+});
+$('holiAdd').onclick = () => {
+  const ds = $('holiAddDate').value, name = $('holiAddName').value.trim() || '自訂假日';
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(ds)) { toast('請選擇日期'); return; }
+  if (E.parse(ds).getDay() === 0) { toast('週日本來就不排診，不需新增'); return; }
+  state.customHoli[ds] = name; stamp('c:' + ds);
+  $('holiAddName').value = ''; save(); render(); toast('已新增 ' + E.md(ds) + ' ' + name);
+};
+
+// ---------- 雲端同步（GitHub 私密 Gist） ----------
+const CLOUDSTORE = 'pgy_fu_cloud_v1', GIST_API = 'https://api.github.com/gists/', GIST_FILE = 'pgy-schedule.json';
+let cloud = { token: '', gist: '', lastSync: null, err: '' };
+try { Object.assign(cloud, JSON.parse(localStorage.getItem(CLOUDSTORE)) || {}); } catch (e) {}
+const saveCloud = () => { try { localStorage.setItem(CLOUDSTORE, JSON.stringify(cloud)); } catch (e) {} };
+const cloudOn = () => !!(cloud.token && cloud.gist);
+const ghHeaders = () => ({ Authorization: 'Bearer ' + cloud.token, Accept: 'application/vnd.github+json' });
+const parseGistId = s => ((s || '').match(/[0-9a-f]{20,40}/i) || [''])[0];
+const payloadOf = s => JSON.stringify({ app: 'pgy-fu', v: 2, schedule: s.schedule, leaves: s.leaves, months: s.months, settings: s.settings, holiOverride: s.holiOverride, customHoli: s.customHoli, stamps: s.stamps });
+let syncing = false, again = false, syncTimer = null, lastSyncAt = 0;
+
+function scheduleSync(ms) {
+  if (!cloudOn()) return;
+  clearTimeout(syncTimer);
+  syncTimer = setTimeout(syncNow, ms == null ? 1200 : ms);
+}
+async function syncNow() {
+  if (!cloudOn()) return false;
+  if (syncing) { again = true; return false; }
+  syncing = true; setBadge('syncing');
+  let ok = false;
+  try {
+    const res = await fetch(GIST_API + cloud.gist, { headers: ghHeaders(), cache: 'no-store' });
+    if (res.status === 401) throw new Error('Token 無效或已過期');
+    if (res.status === 403 || res.status === 429) throw new Error('GitHub 暫時拒絕（權限不足或次數過多）');
+    if (res.status === 404) throw new Error('找不到這個 Gist（確認 ID 與 Token 屬於同一帳號）');
+    if (!res.ok) throw new Error('GitHub 回應 ' + res.status);
+    const g = await res.json(), f = (g.files || {})[GIST_FILE];
+    let raw = '';
+    if (f) {
+      raw = f.truncated || f.content == null ? await (await fetch(f.raw_url, { cache: 'no-store' })).text() : f.content;
+      let remote = null;
+      try { remote = JSON.parse(raw || '{}'); } catch (e) { throw new Error('雲端 ' + GIST_FILE + ' 格式錯誤'); }
+      if (remote && remote.schedule) {
+        const merged = E.mergeStates(state, normalize(remote));
+        state = normalize(merged); state.stamps = merged.stamps;
+        try { localStorage.setItem(STORE, JSON.stringify(state)); } catch (e) {}
+      }
+    }
+    const want = payloadOf(state);
+    if (raw.trim() !== want) {
+      const r2 = await fetch(GIST_API + cloud.gist, { method: 'PATCH', headers: Object.assign(ghHeaders(), { 'Content-Type': 'application/json' }), body: JSON.stringify({ files: { [GIST_FILE]: { content: want } } }) });
+      if (!r2.ok) throw new Error('上傳失敗（GitHub 回應 ' + r2.status + '）');
+    }
+    cloud.lastSync = Date.now(); cloud.err = ''; lastSyncAt = Date.now(); ok = true;
+    fillSettings(); render();
+  } catch (err) {
+    cloud.err = navigator.onLine ? (err.message || '同步失敗') : '目前沒有網路連線';
+  } finally {
+    saveCloud(); syncing = false; setBadge(cloud.err ? 'error' : 'ok'); renderCloudForm();
+    if (again) { again = false; scheduleSync(400); }
+  }
+  return ok;
+}
+function setBadge(st) {
+  const dot = $('syncDot'), tx = $('syncText'), b = $('syncBadge');
+  const pad = E.pad;
+  if (!cloudOn()) { dot.className = 'w-2 h-2 rounded-full bg-slate-300'; tx.textContent = '未同步'; b.className = 'px-2 py-1.5 rounded-lg text-xs border border-slate-200 text-slate-500 flex items-center gap-1'; return; }
+  const t = cloud.lastSync ? new Date(cloud.lastSync) : null;
+  const map = { syncing: ['bg-amber-400 animate-pulse', '同步中…'], error: ['bg-red-500', '同步失敗'], ok: ['bg-emerald-500', t ? `已同步 ${pad(t.getHours())}:${pad(t.getMinutes())}` : '已連線'] }[st];
+  dot.className = 'w-2 h-2 rounded-full ' + map[0]; tx.textContent = map[1];
+  b.className = 'px-2 py-1.5 rounded-lg text-xs border flex items-center gap-1 ' + (st === 'error' ? 'border-red-200 text-red-600' : 'border-emerald-200 text-emerald-700');
+  b.title = cloud.err || '點一下立即同步';
+}
+function renderCloudForm() {
+  $('cloudToken').value = cloud.token || ''; $('cloudGist').value = cloud.gist || '';
+  const st = $('cloudStatus');
+  st.textContent = !cloudOn() ? '未設定' : cloud.err ? '⚠ ' + cloud.err : cloud.lastSync ? '上次同步 ' + new Date(cloud.lastSync).toLocaleString('zh-TW', { hour12: false }) : '已設定';
+  st.className = 'text-xs ' + (cloud.err ? 'text-red-600' : 'text-slate-500');
+  let ledger = null;
+  try { ledger = JSON.parse(localStorage.getItem('dental_ledger:cloud')); } catch (e) {}
+  const canReuse = ledger && ledger.token && ledger.gist && (ledger.token !== cloud.token || ledger.gist !== cloud.gist);
+  $('reuseLedger').classList.toggle('hidden', !canReuse);
+}
+async function connectAndSync(msg) {
+  toast(msg || '開始同步…');
+  const ok = await syncNow();
+  toast(ok ? '同步完成' : '同步失敗：' + (cloud.err || ''));
+}
+$('btnReuseLedger').onclick = () => {
+  const l = JSON.parse(localStorage.getItem('dental_ledger:cloud'));
+  cloud.token = l.token; cloud.gist = l.gist; cloud.err = ''; saveCloud(); renderCloudForm(); connectAndSync();
+};
+$('cloudConnect').onclick = () => {
+  const token = $('cloudToken').value.trim(), gist = parseGistId($('cloudGist').value);
+  if (!token || !gist) { toast('請填入 Token 與 Gist ID'); return; }
+  cloud.token = token; cloud.gist = gist; cloud.err = ''; saveCloud(); connectAndSync();
+};
+$('cloudSyncNow').onclick = () => { if (!cloudOn()) { toast('請先儲存 Token 與 Gist ID'); return; } connectAndSync('同步中…'); };
+$('syncBadge').onclick = () => {
+  if (!cloudOn()) { const p = $('settingsPanel'); p.open = true; p.scrollIntoView({ behavior: 'smooth' }); return; }
+  connectAndSync('同步中…');
+};
+$('cloudDisconnect').onclick = () => {
+  if (!confirm('取消這台裝置的同步設定？（不會刪除雲端或本機資料）')) return;
+  cloud = { token: '', gist: '', lastSync: null, err: '' }; saveCloud(); renderCloudForm(); setBadge('ok'); toast('已取消同步');
+};
+$('cloudLink').onclick = async () => {
+  if (!cloudOn()) { toast('請先儲存 Token 與 Gist ID'); return; }
+  const payload = btoa(unescape(encodeURIComponent(JSON.stringify({ t: cloud.token, g: cloud.gist })))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  const link = location.origin + location.pathname + '#sync=' + payload;
+  const box = $('cloudLinkBox'); box.value = link; box.classList.remove('hidden');
+  try { await navigator.clipboard.writeText(link); toast('已複製同步連結（內含 Token，只傳給自己）'); } catch (e) { box.focus(); box.select(); toast('請長按連結拷貝'); }
+};
+function consumeSyncHash() {
+  const m = location.hash.match(/^#sync=([A-Za-z0-9_\-]+)/);
+  if (!m) return;
+  try {
+    const j = JSON.parse(decodeURIComponent(escape(atob(m[1].replace(/-/g, '+').replace(/_/g, '/')))));
+    if (j && j.t && j.g) { cloud.token = j.t; cloud.gist = j.g; cloud.err = ''; saveCloud(); toast('已套用同步設定'); }
+  } catch (e) {}
+  history.replaceState(null, '', location.pathname + location.search);
+}
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && cloudOn() && Date.now() - lastSyncAt > 20000) syncNow(); });
+window.addEventListener('pageshow', e => { if (e.persisted && cloudOn()) syncNow(); });
+window.addEventListener('online', () => { if (cloudOn()) syncNow(); });
+
+// ---------- 模擬器事件 ----------
+$('simMonth').value = E.mKey(TI + 2);
+['simMonth', 'simLeave', 'simAssume'].forEach(id => $(id).addEventListener('input', renderSim));
+$('simAssume').addEventListener('change', renderSim);
+document.querySelectorAll('.simQ').forEach(b => (b.onclick = () => { $('simLeave').value = b.dataset.q; renderSim(); }));
+
+// ---------- 設定 ----------
+function fillSettings() {
+  $('setProvider').value = keys.provider; $('setGeminiKey').value = keys.geminiKey; $('setClaudeKey').value = keys.claudeKey;
+  $('setGeminiModel').value = keys.geminiModel; $('setClaudeModel').value = keys.claudeModel;
+  $('setDoctor').value = opt().doctor; $('setMin').value = opt().minPerWeek; $('setWindow').value = opt().window; $('setCross').value = opt().crossRule;
+}
+$('btnSettings').onclick = () => { const p = $('settingsPanel'); p.open = !p.open; if (p.open) p.scrollIntoView({ behavior: 'smooth' }); };
+$('btnSaveSettings').onclick = () => {
+  Object.assign(keys, { provider: $('setProvider').value, geminiKey: $('setGeminiKey').value.trim(), claudeKey: $('setClaudeKey').value.trim(),
+    geminiModel: $('setGeminiModel').value.trim() || defaultKeys().geminiModel, claudeModel: $('setClaudeModel').value.trim() || defaultKeys().claudeModel });
+  Object.assign(state.settings, { doctor: $('setDoctor').value.trim() || '傅', minPerWeek: Math.max(0, +$('setMin').value || 0),
+    window: Math.max(0, Math.round(+$('setWindow').value || 0)), crossRule: $('setCross').value });
+  stamp('cfg'); saveKeys(); save(); render(); toast('設定已儲存');
+};
+$('btnReset').onclick = () => {
+  if (!confirm('還原為 2026/11–12 預設班表？目前所有班表資料會被覆蓋（建議先匯出備份）。')) return;
+  const prev = state, stamps = state.stamps; state = defaultState(); state.settings = prev.settings; state.stamps = stamps; stampAll(prev);
+  undoSnap = null; save(); fillSettings(); render(); toast('已還原預設資料');
+};
+
+// ---------- 匯出／匯入 ----------
+$('btnExport').onclick = () => {
+  const blob = new Blob([JSON.stringify({ app: 'pgy-fu', exportedAt: new Date().toISOString(), ...state }, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob); a.download = `PGY診次備份_${TODAY_S}.json`;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+};
+$('fileImport').addEventListener('change', async e => {
+  const f = e.target.files[0]; e.target.value = '';
+  if (!f) return;
+  try {
+    const j = JSON.parse(await f.text());
+    if (!j.schedule || !Array.isArray(j.months)) throw new Error('格式不符');
+    if (!confirm('匯入會覆蓋目前資料，確定？')) return;
+    const prev = state, stamps = state.stamps;
+    state = normalize({ version: j.version, schedule: j.schedule, leaves: j.leaves, months: j.months, settings: j.settings, holiOverride: j.holiOverride, customHoli: j.customHoli });
+    state.stamps = stamps; stampAll(prev);
+    save(); fillSettings(); render(); toast('匯入完成');
+  } catch (err) { alert('匯入失敗：' + err.message); }
+});
+
+// ---------- PWA ----------
+(function pwa() {
+  try {
+    const c = document.createElement('canvas'); c.width = c.height = 512;
+    const g = c.getContext('2d');
+    const grd = g.createLinearGradient(0, 0, 512, 512); grd.addColorStop(0, '#2563eb'); grd.addColorStop(1, '#1e3a8a');
+    g.fillStyle = grd; g.fillRect(0, 0, 512, 512);
+    g.fillStyle = '#fff'; g.font = 'bold 290px "PingFang TC","Noto Sans TC",sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
+    g.fillText('傅', 256, 236);
+    g.font = 'bold 76px -apple-system,sans-serif'; g.fillText('PGY', 256, 430);
+    const icon = c.toDataURL('image/png');
+    $('touchIcon').href = icon;
+    const manifest = { name: '牙醫 PGY 診次計算機', short_name: 'PGY診次', start_url: location.href.split('#')[0], display: 'standalone',
+      background_color: '#eff6ff', theme_color: '#1d4ed8', icons: [{ src: icon, sizes: '512x512', type: 'image/png', purpose: 'any' }] };
+    $('manifestLink').href = URL.createObjectURL(new Blob([JSON.stringify(manifest)], { type: 'application/manifest+json' }));
+  } catch (e) {}
+  const ios = /iphone|ipad|ipod/i.test(navigator.userAgent);
+  const standalone = window.navigator.standalone || matchMedia('(display-mode: standalone)').matches;
+  if (ios && !standalone && !localStorage.getItem(HINT)) $('iosHint').classList.remove('hidden');
+  $('iosHintClose').onclick = () => { $('iosHint').classList.add('hidden'); try { localStorage.setItem(HINT, 1); } catch (e) {} };
+})();
+
+$('todayLabel').textContent = `${TODAY.getFullYear()}/${E.md(TODAY)}（${WD[TODAY.getDay()]}）`;
+consumeSyncHash();
+fillSettings();
+render();
+renderCloudForm();
+setBadge('ok');
+if (cloudOn()) syncNow();
+})();
+</script>
+</body>
+</html>
