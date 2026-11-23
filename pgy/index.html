@@ -23,6 +23,7 @@
   .slot:active { transform: scale(.92); }
   .slot-on  { background:#2563eb; color:#fff; border-color:#2563eb; }
   .slot-off { background:#fff; color:#94a3b8; border-color:#e2e8f0; }
+  .slot-proj { background:#dbeafe; color:#1d4ed8; border:1px dashed #60a5fa; }
   .tabnum { font-variant-numeric: tabular-nums; }
   details > summary { list-style: none; }
   details > summary::-webkit-details-marker { display: none; }
@@ -138,44 +139,62 @@ const Engine = (() => {
     };
   }
 
-  // 未排班月份以預設班表推估（不動已列入計算月份的週）
-  function fillTemplate(sched, months, opt, fromIdx, toIdx, template) {
+  // 固定班表：template 可為 {週幾: [早,午,晚]} 或 函式(日期字串) → [早,午,晚]
+  const tplFor = (template, ds) => (typeof template === 'function' ? template(ds) : template[parse(ds).getDay()]);
+
+  // 以固定班表填入未列入計算的月份（不動已列入計算月份的週）
+  function fillTemplate(sched, months, opt, idxList, template) {
     const s = JSON.parse(JSON.stringify(sched)), ms = [...months], added = [];
-    for (let i = fromIdx; i <= toIdx; i++) { const k = mKey(i); if (!ms.includes(k)) { ms.push(k); added.push(k); } }
+    idxList.forEach(i => { const k = mKey(i); if (!ms.includes(k)) { ms.push(k); added.push(k); } });
     const addedSet = new Set(added);
     added.forEach(k => weekMondaysOfMonth(k).forEach(mon => {
       if (!addedSet.has(assignMonth(mon, opt.crossRule))) return;
       for (let i = 0; i < 6; i++) {
-        const d = addDays(mon, i), ds = ymd(d);
+        const ds = ymd(addDays(mon, i));
         if (s[ds] || (opt.holidays && opt.holidays.has(ds))) continue;
-        const t = template[d.getDay()];
+        const t = tplFor(template, ds);
         if (t && t.some(Boolean)) s[ds] = [...t];
       }
     }));
     return { sched: s, months: ms, added };
   }
 
-  function simulate(sched, months, opt, targetKey, leave, assume, template) {
-    const ti = mIdx(targetKey);
-    let S = sched, M = months, added = [];
+  // leaveDays: [{date, slots:[1,1,1]}] 指定日期請假（slots 為要請掉的時段）；leave: 另外再請的診數（算在 targetKey 月）
+  function simulate(sched, months, opt, targetKey, leave, assume, template, leaveDays = []) {
+    const W = opt.window, ti = mIdx(targetKey);
+    const leaveIdx = leaveDays.map(d => mIdx(d.date.slice(0, 7)));
+    const idx = new Set(leaveIdx);
     if (assume) {
-      const from = Math.min(ti, ...months.map(mIdx));
-      ({ sched: S, months: M, added } = fillTemplate(sched, months, opt, from, ti + opt.window, template));
+      const from = Math.min(ti, ...leaveIdx, ...months.map(mIdx));
+      const to = Math.max(ti, ...leaveIdx) + W;
+      for (let i = from; i <= to; i++) idx.add(i);
     }
-    const weeks = buildWeeks(S, M, opt);
-    const run = L => {
-      const r = allocate(weeks, opt, L > 0 ? [{ mi: ti, amount: L, label: '模擬請假' }] : []);
+    const { sched: S, months: M, added } = fillTemplate(sched, months, opt, [...idx].sort((a, b) => a - b), template);
+    const S2 = JSON.parse(JSON.stringify(S));
+    const lost = leaveDays.map(({ date, slots }) => {
+      const before = S2[date] || [0, 0, 0];
+      const after = before.map((x, j) => (x && slots[j] ? 0 : x));
+      const n = before.filter(Boolean).length - after.filter(Boolean).length;
+      if (after.some(Boolean)) S2[date] = after; else delete S2[date];
+      return { date, before, n };
+    });
+    const weeks = buildWeeks(S, M, opt), weeks2 = buildWeeks(S2, M, opt);
+    const run = (ws, L) => {
+      const r = allocate(ws, opt, L > 0 ? [{ mi: ti, amount: L, label: '模擬請假' }] : []);
       return { r, u: r.defs.reduce((a, d) => a + d.unfilled, 0) };
     };
-    const base = run(0), withL = run(leave);
+    const base = run(weeks, 0), withL = run(weeks2, leave);
     let max = 0;
-    for (let L = 1; L <= 300; L++) { if (run(L).u > base.u) break; max = L; }
+    for (let L = 1; L <= 300; L++) { if (run(weeks2, L).u > base.u) break; max = L; }
     const syn = withL.r.defs.find(d => d.synthetic);
+    const leaveSet = new Set(leaveDays.map(d => d.date));
     return {
-      need: withL.u - base.u, max, left: max - leave, added,
-      monthWeeks: weeks.filter(w => w.mi === ti),
-      sources: base.r.sur.filter(s => s.remaining > 0 && ti >= s.mi - opt.window && ti <= s.mi + opt.window),
-      fills: syn ? syn.fills : []
+      need: withL.u - base.u, max, left: max - leave, added, lost,
+      lostTotal: lost.reduce((a, x) => a + x.n, 0),
+      monthWeeks: weeks2.filter(w => w.mi === ti),
+      sources: base.r.sur.filter(s => s.remaining > 0 && ti >= s.mi - W && ti <= s.mi + W),
+      fills: syn ? syn.fills : [],
+      dayFills: withL.r.defs.filter(d => d.week && d.week.days.some(ds => leaveSet.has(ds)))
     };
   }
 
@@ -188,6 +207,7 @@ const Engine = (() => {
       if ((rs[k] || 0) <= (out.stamps[k] || 0)) continue;
       out.stamps[k] = rs[k];
       if (k === 'cfg') { out.settings = Object.assign({}, out.settings, R.settings); continue; }
+      if (k === 'pat') { if (R.patterns) out.patterns = JSON.parse(JSON.stringify(R.patterns)); continue; }
       const p = k.slice(0, 2), id = k.slice(2);
       const field = { 's:': 'schedule', 'l:': 'leaves', 'h:': 'holiOverride', 'c:': 'customHoli' }[p];
       if (field) {
@@ -205,7 +225,7 @@ const Engine = (() => {
   }
 
   return { pad, ymd, parse, addDays, mKeyOf, mIdx, mKey, mondayOf, md, mLabel, mShort,
-    assignMonth, weekMondaysOfMonth, makeWeek, buildWeeks, allocate, analyze, simulate, countDay, mergeStates };
+    assignMonth, weekMondaysOfMonth, makeWeek, tplFor, buildWeeks, allocate, analyze, simulate, countDay, mergeStates };
 })();
 if (typeof module !== 'undefined') module.exports = Engine;
 </script>
@@ -239,13 +259,21 @@ if (typeof module !== 'undefined') module.exports = Engine;
   <section class="rounded-2xl bg-white border border-slate-200 shadow-sm p-4">
     <div class="flex items-center justify-between mb-3">
       <h2 class="font-bold text-blue-950">🧮 請假模擬器</h2>
-      <label class="flex items-center gap-1.5 text-xs text-slate-500"><input id="simAssume" type="checkbox" checked class="w-4 h-4 accent-blue-600">未排班月份以預設班表推估</label>
+      <label class="flex items-center gap-1.5 text-xs text-slate-500"><input id="simAssume" type="checkbox" checked class="w-4 h-4 accent-blue-600">未來月份照固定班表推估</label>
+    </div>
+    <div class="mb-3">
+      <p class="text-sm text-slate-600">指定請假日期 <span class="text-xs text-slate-400">（自動依班表算出少幾診）</span></p>
+      <div class="mt-1 flex gap-2">
+        <input id="simDate" type="date" class="min-w-0 flex-1 h-12 rounded-xl border-slate-300 border px-3 text-base bg-white">
+        <button id="simAddDate" class="h-12 px-4 rounded-xl bg-blue-600 text-white text-sm font-medium shrink-0">＋ 加入</button>
+      </div>
+      <div id="simDays" class="mt-2 space-y-1.5"></div>
     </div>
     <div class="grid grid-cols-2 gap-3">
       <label class="block text-sm text-slate-600">請假月份
         <input id="simMonth" type="month" class="mt-1 w-full h-12 rounded-xl border-slate-300 border px-3 text-base bg-white">
       </label>
-      <div class="text-sm text-slate-600">預計請假診數
+      <div class="text-sm text-slate-600"><span id="simLeaveLabel">預計請假診數</span>
         <div class="mt-1 flex h-12 rounded-xl border border-slate-300 overflow-hidden bg-white">
           <button id="simMinus" aria-label="減少" class="w-12 shrink-0 text-2xl text-blue-700 bg-blue-50 active:bg-blue-100 select-none">−</button>
           <input id="simLeave" type="number" inputmode="numeric" min="0" max="60" value="3" class="min-w-0 flex-1 text-center text-xl font-bold tabnum outline-none">
@@ -274,7 +302,7 @@ if (typeof module !== 'undefined') module.exports = Engine;
       <button id="btnManage" class="px-3 py-1.5 rounded-lg text-sm"></button>
       <div class="w-full sm:w-auto sm:ml-auto flex flex-wrap gap-2">
         <label class="px-3 py-1.5 rounded-lg text-sm bg-blue-600 text-white cursor-pointer hover:bg-blue-700">📷 上傳班表辨識<input id="fileImage" type="file" accept="image/*" class="hidden"></label>
-        <button id="btnTemplate" class="px-3 py-1.5 rounded-lg text-sm border border-blue-200 text-blue-700 hover:bg-blue-50">套用預設班表</button>
+        <button id="btnTemplate" class="px-3 py-1.5 rounded-lg text-sm border border-blue-200 text-blue-700 hover:bg-blue-50">套用固定班表</button>
         <button id="btnClearMonth" class="px-3 py-1.5 rounded-lg text-sm border border-slate-200 text-slate-600 hover:bg-slate-50">清空本月</button>
         <button id="btnUndo" class="hidden px-3 py-1.5 rounded-lg text-sm border border-amber-300 text-amber-700 bg-amber-50">復原上次辨識/套用</button>
       </div>
@@ -283,7 +311,8 @@ if (typeof module !== 'undefined') module.exports = Engine;
     <div class="px-4 pt-3 flex flex-wrap items-center gap-2 text-xs text-slate-500">
       <span>列入計算的月份：</span><span id="monthChips" class="flex flex-wrap gap-1.5"></span>
     </div>
-    <p class="px-4 pt-2 text-xs text-slate-500">點「早／午／晚」切換有無診；點日期可標記「假」。預設班表＝一午晚、二早午晚、三早午、五早午晚（每週 10 診）。</p>
+    <div id="patBox" class="mx-4 mt-3 rounded-2xl border border-blue-100 bg-blue-50/60 p-3"></div>
+    <p class="px-4 pt-3 text-xs text-slate-500">點「早／午／晚」切換有無診（臨時加診、調班直接點）；點日期可標記「假」。淡藍虛線格＝依固定班表推估、尚未列入計算的月份，點任一格就會建立該月班表。</p>
     <div id="grid" class="p-4 space-y-3"></div>
   </section>
 
@@ -422,7 +451,7 @@ const E = Engine;
 const STORE = 'pgy_fu_state_v1', KEYSTORE = 'pgy_fu_keys_v1', HINT = 'pgy_fu_ioshint';
 const SLOTS = ['早', '午', '晚'];
 const WD = ['日', '一', '二', '三', '四', '五', '六'];
-const TEMPLATE = { 1: [0, 1, 1], 2: [1, 1, 1], 3: [1, 1, 0], 5: [1, 1, 1] };
+const DEFAULT_PATTERN = { 1: [0, 1, 1], 2: [1, 1, 1], 3: [1, 1, 0], 5: [1, 1, 1] }; // 一午晚、二早午晚、三早午、五早午晚
 
 const DEFAULT_SCHEDULE = (() => {
   const s = {}, N = '011', F = '111', A = '110';
@@ -470,7 +499,8 @@ const defaultState = () => ({
   leaves: { '2026-12-18': 1 },
   months: ['2026-11', '2026-12'],
   settings: defaultSettings(),
-  holiOverride: {}, customHoli: {}, stamps: {}
+  holiOverride: {}, customHoli: {}, stamps: {},
+  patterns: [{ from: '2026-11-01', days: clone(DEFAULT_PATTERN) }]
 });
 const defaultKeys = () => ({ provider: 'gemini', geminiKey: '', claudeKey: '', geminiModel: 'gemini-2.5-flash', claudeModel: 'claude-sonnet-5-5' });
 
@@ -479,6 +509,7 @@ function normalize(s) {
   const out = Object.assign(d, s);
   out.leaves = s.leaves || {}; out.holiOverride = s.holiOverride || {}; out.customHoli = s.customHoli || {}; out.stamps = s.stamps || {};
   out.settings = Object.assign(defaultSettings(), s.settings);
+  out.patterns = Array.isArray(s.patterns) && s.patterns.length ? s.patterns : d.patterns;
   if (!s.version || s.version < 2) out.settings.window = 1; // 新規定：只能用前後一個月互補
   out.version = 2;
   return out;
@@ -507,9 +538,35 @@ function stampAll(prev) {
   const keysOf = s => [
     ...Object.keys(s.schedule || {}).map(k => 's:' + k), ...Object.keys(s.leaves || {}).map(k => 'l:' + k),
     ...Object.keys(s.holiOverride || {}).map(k => 'h:' + k), ...Object.keys(s.customHoli || {}).map(k => 'c:' + k),
-    ...(s.months || []).map(k => 'm:' + k), 'cfg'];
+    ...(s.months || []).map(k => 'm:' + k), 'cfg', 'pat'];
   const t = Date.now();
   new Set([...keysOf(prev), ...keysOf(state)]).forEach(k => { state.stamps[k] = t; });
+}
+
+// ---- 固定班表（可設定生效日的多個版本） ----
+const sortedPats = () => state.patterns.slice().sort((a, b) => (a.from < b.from ? -1 : 1));
+function patternAt(ds) { let p = null; for (const x of sortedPats()) if (x.from <= ds) p = x; return p || sortedPats()[0]; }
+function templateFor(ds) { const p = patternAt(ds); return p ? (p.days[E.parse(ds).getDay()] || null) : null; }
+const isManagedDay = ds => state.months.includes(E.assignMonth(E.mondayOf(E.parse(ds)), state.settings.crossRule));
+// 某天「預計」的診次：已列入計算的月份看實際班表，否則看固定班表（勾選的國定假日不排）
+function plannedDay(ds) {
+  if (isManagedDay(ds) || state.schedule[ds]) return state.schedule[ds] || [0, 0, 0];
+  const h = opt().holidays;
+  if (h && h.has(ds)) return [0, 0, 0];
+  return templateFor(ds) || [0, 0, 0];
+}
+// 第一次把某月列入計算時，先依固定班表填好（不覆蓋已有資料）
+function materializeMonth(k) {
+  const h = opt().holidays;
+  E.weekMondaysOfMonth(k).forEach(mon => {
+    if (E.assignMonth(mon, state.settings.crossRule) !== k) return;
+    for (let i = 0; i < 6; i++) {
+      const ds = E.ymd(E.addDays(mon, i));
+      if (state.schedule[ds] || (h && h.has(ds))) continue;
+      const t = templateFor(ds);
+      if (t && t.some(Boolean)) setDay(ds, t);
+    }
+  });
 }
 
 // ---- 國定假日 ----
@@ -549,7 +606,7 @@ function weekStatus(w) {
   if (w.start <= TODAY_S) return ['進行中', 'bg-blue-100 text-blue-700'];
   return ['預排', 'bg-amber-50 text-amber-700'];
 }
-function ensureManaged(k) { if (!state.months.includes(k)) setManaged(k, true); }
+function ensureManaged(k, fill = true) { if (!state.months.includes(k)) { if (fill) materializeMonth(k); setManaged(k, true); } }
 
 // ---------- 狀態卡 ----------
 function renderCards(a, alt) {
@@ -617,21 +674,23 @@ function renderGrid() {
   const html = E.weekMondaysOfMonth(viewMonth).map(mon => {
     const w = E.makeWeek(state.schedule, mon, o);
     const holDays = w.days.filter(ds => holiName(ds));
+    const proj = !state.months.includes(w.month);
+    if (proj) w.actual = w.days.reduce((a, ds) => a + plannedDay(ds).filter(Boolean).length, 0), w.net = w.actual - w.min;
     const counted = state.months.includes(w.month);
     const badges = [
       `<span class="rounded-full px-2 py-0.5 text-[11px] ${w.month === viewMonth ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-600'}">歸 ${E.mShort(w.month)}</span>`,
       w.cross ? '<span class="rounded-full px-2 py-0.5 text-[11px] bg-violet-100 text-violet-700">跨月週</span>' : '',
-      counted ? '' : '<span class="rounded-full px-2 py-0.5 text-[11px] bg-amber-100 text-amber-700">未列入計算</span>'
+      counted ? '' : '<span class="rounded-full px-2 py-0.5 text-[11px] bg-sky-100 text-sky-700">固定班表推估</span>'
     ].join('');
     const days = w.days.map((ds, i) => {
       const d = E.parse(ds), inMonth = E.mKeyOf(d) === viewMonth;
-      const v = state.schedule[ds] || [0, 0, 0], leave = state.leaves[ds], isToday = ds === TODAY_S;
+      const v = proj ? plannedDay(ds) : (state.schedule[ds] || [0, 0, 0]), leave = state.leaves[ds], isToday = ds === TODAY_S;
       const hn = holiName(ds), hon = hn && hmode && holiIncluded(ds);
       return `<div class="flex flex-col items-center gap-1 ${inMonth ? '' : 'opacity-55'}">
         <button data-leave="${ds}" title="${hn}" class="w-full text-[11px] leading-tight rounded-md py-0.5 ${isToday ? 'bg-blue-600 text-white' : hn ? (hon ? 'bg-red-50 text-red-600' : 'text-red-400') : 'text-slate-600'}">
           <span class="tabnum">${E.md(d)}</span><br>${WD[d.getDay()]}${hn ? ' 🎌' : ''}${leave ? ' <span class="text-red-500 font-bold">假</span>' : ''}
         </button>
-        ${SLOTS.map((s, j) => `<button data-date="${ds}" data-slot="${j}" class="slot w-full h-8 sm:h-9 rounded-md border text-xs font-medium ${v[j] ? 'slot-on' : 'slot-off'}">${s}</button>`).join('')}
+        ${SLOTS.map((s, j) => `<button data-date="${ds}" data-slot="${j}" class="slot w-full h-8 sm:h-9 rounded-md border text-xs font-medium ${v[j] ? (proj && !state.schedule[ds] ? 'slot-proj' : 'slot-on') : 'slot-off'}">${s}</button>`).join('')}
       </div>`;
     }).join('');
     return `<div class="rounded-xl border ${w.cross ? 'border-violet-200' : 'border-slate-200'} overflow-hidden">
@@ -647,29 +706,130 @@ function renderGrid() {
   $('btnUndo').classList.toggle('hidden', !undoSnap);
 }
 
+// ---------- 固定班表編輯 ----------
+let patSel = null, patAdding = false;
+const fmtDate = ds => { const d = E.parse(ds); return `${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()}`; };
+const patSummary = p => [1, 2, 3, 4, 5, 6].filter(d => (p.days[d] || []).some(Boolean)).map(d => WD[d] + slotStr(p.days[d])).join('、') || '（無）';
+function renderPatterns() {
+  const pats = sortedPats();
+  if (!patSel || !pats.find(p => p.from === patSel)) patSel = patternAt(TODAY_S).from;
+  const cur = pats.find(p => p.from === patSel), idx = pats.indexOf(cur), next = pats[idx + 1];
+  const total = [1, 2, 3, 4, 5, 6].reduce((a, d) => a + (cur.days[d] || []).filter(Boolean).length, 0);
+  $('patBox').innerHTML = `
+    <div class="flex flex-wrap items-center gap-2">
+      <b class="text-blue-950 text-sm">🗓️ 固定班表</b>
+      ${pats.map(p => `<button data-pat="${p.from}" class="rounded-full px-2.5 py-1 text-xs border ${p.from === patSel ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-slate-600 border-slate-200'}">${fmtDate(p.from)} 起</button>`).join('')}
+      <button id="patNew" class="rounded-full px-2.5 py-1 text-xs border border-dashed border-blue-400 text-blue-700 bg-white">＋ 新增班表變更</button>
+    </div>
+    ${patAdding ? `<div class="mt-2 flex flex-wrap items-center gap-2 text-sm bg-white rounded-xl p-2 border border-blue-100">
+      從 <input id="patNewDate" type="date" class="rounded-lg border border-slate-300 px-2 py-1"> 起改用新班表
+      <button id="patNewOk" class="px-3 py-1 rounded-lg bg-blue-600 text-white text-xs">建立</button>
+      <button id="patNewCancel" class="px-3 py-1 rounded-lg border border-slate-200 text-xs">取消</button>
+      <span class="w-full text-[11px] text-slate-500">會先複製當天原本的班表，建立後再點格子修改。</span></div>` : ''}
+    <p class="mt-2 text-xs text-slate-600">生效期間：<b>${fmtDate(cur.from)}</b> ～ ${next ? `<b>${fmtDate(E.ymd(E.addDays(E.parse(next.from), -1)))}</b>` : '之後'} · 每週 <b>${total}</b> 診 · ${patSummary(cur)}</p>
+    <div class="mt-2 grid grid-cols-6 gap-1 sm:gap-2 max-w-md">
+      ${[1, 2, 3, 4, 5, 6].map(d => `<div class="flex flex-col items-center gap-1"><span class="text-[11px] text-slate-500">週${WD[d]}</span>
+        ${SLOTS.map((sl, j) => `<button data-pday="${d}" data-pslot="${j}" class="slot w-full h-8 rounded-md border text-xs font-medium ${(cur.days[d] || [])[j] ? 'slot-on' : 'slot-off'}">${sl}</button>`).join('')}</div>`).join('')}
+    </div>
+    <div class="mt-2 flex flex-wrap gap-2 text-xs">
+      <button id="patApply" class="px-3 py-1.5 rounded-lg border border-blue-200 text-blue-700 bg-white">套用到 ${fmtDate(cur.from)} 起已建立的班表</button>
+      ${pats.length > 1 ? `<button id="patDel" class="px-3 py-1.5 rounded-lg border border-red-200 text-red-600 bg-white">刪除這個版本</button>` : ''}
+    </div>
+    <p class="mt-1 text-[11px] text-slate-500">未來月份（淡藍虛線）會自動照固定班表推估；已建立的月份不會自動改，需要的話按上面的「套用」。</p>`;
+}
+$('patBox').addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b) return;
+  const cur = state.patterns.find(p => p.from === patSel);
+  if (b.dataset.pat) { patSel = b.dataset.pat; renderPatterns(); return; }
+  if (b.dataset.pday) {
+    const d = b.dataset.pday, j = +b.dataset.pslot, v = (cur.days[d] || [0, 0, 0]).slice();
+    v[j] = v[j] ? 0 : 1;
+    if (v.some(Boolean)) cur.days[d] = v; else delete cur.days[d];
+    stamp('pat'); save(); render(); return;
+  }
+  if (b.id === 'patNew') { patAdding = true; renderPatterns(); return; }
+  if (b.id === 'patNewCancel') { patAdding = false; renderPatterns(); return; }
+  if (b.id === 'patNewOk') {
+    const ds = $('patNewDate').value;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(ds)) { toast('請選擇生效日期'); return; }
+    if (state.patterns.find(p => p.from === ds)) { patSel = ds; patAdding = false; renderPatterns(); toast('這天已有班表版本'); return; }
+    state.patterns.push({ from: ds, days: clone(patternAt(ds).days) });
+    patSel = ds; patAdding = false; stamp('pat'); save(); render(); toast(`已建立 ${fmtDate(ds)} 起的新班表，請點格子修改`); return;
+  }
+  if (b.id === 'patDel') {
+    if (!confirm(`刪除 ${fmtDate(cur.from)} 起的班表版本？`)) return;
+    state.patterns = state.patterns.filter(p => p !== cur); patSel = null; stamp('pat'); save(); render(); return;
+  }
+  if (b.id === 'patApply') {
+    const pats = sortedPats(), next = pats[pats.indexOf(cur) + 1];
+    const h = opt().holidays;
+    const targets = Object.keys(state.schedule).concat(...state.months.map(k => {
+      const r = []; E.weekMondaysOfMonth(k).forEach(mon => { for (let i = 0; i < 6; i++) r.push(E.ymd(E.addDays(mon, i))); }); return r;
+    })).filter((ds, i, a) => a.indexOf(ds) === i && ds >= cur.from && (!next || ds < next.from) && isManagedDay(ds));
+    if (!targets.length) { toast('這段期間還沒有已建立的班表'); return; }
+    if (!confirm(`用這個固定班表覆蓋 ${fmtDate(cur.from)} 起已建立的 ${targets.length} 天班表？（臨時加診、請假會被蓋掉，可按「復原」）`)) return;
+    undoSnap = clone(state.schedule);
+    targets.forEach(ds => { const t = templateFor(ds); setDay(ds, t && !(h && h.has(ds)) ? t : null); });
+    save(); render(); toast('已套用');
+  }
+});
+
 // ---------- 模擬器 ----------
+let simDays = [];
+try { simDays = JSON.parse(localStorage.getItem('pgy_fu_simdays')) || []; } catch (e) {}
+const saveSimDays = () => { try { localStorage.setItem('pgy_fu_simdays', JSON.stringify(simDays)); } catch (e) {} };
+const dayLabel = ds => { const d = E.parse(ds); return `${d.getMonth() + 1}/${d.getDate()}（${WD[d.getDay()]}）`; };
+
+function renderSimDays() {
+  $('simDays').innerHTML = simDays.map((x, i) => {
+    const plan = plannedDay(x.date), n = plan.filter(Boolean).length, hn = holiName(x.date);
+    return `<div class="flex items-center gap-2 rounded-xl bg-slate-50 border border-slate-200 px-2.5 py-1.5">
+      <span class="text-sm font-semibold tabnum w-[78px] shrink-0">${dayLabel(x.date)}</span>
+      ${n ? SLOTS.map((sl, j) => plan[j]
+        ? `<button data-sd="${i}" data-ss="${j}" class="w-9 h-8 rounded-lg text-xs font-bold border ${x.slots[j] ? 'bg-red-500 text-white border-red-500' : 'bg-white text-slate-400 border-slate-200'}">${sl}</button>`
+        : `<span class="w-9 h-8 rounded-lg text-xs grid place-items-center text-slate-300">${sl}</span>`).join('')
+        : `<span class="text-xs text-slate-400">當天沒有排診${hn ? '（' + hn + '）' : ''}</span>`}
+      <span class="ml-auto text-xs text-red-600 font-semibold tabnum">${n ? '−' + plan.filter((v, j) => v && x.slots[j]).length + ' 診' : ''}</span>
+      <button data-sdel="${i}" class="w-7 h-7 rounded-lg text-slate-400 hover:text-red-500">✕</button>
+    </div>`;
+  }).join('');
+  $('simLeaveLabel').textContent = simDays.length ? '另外再請（診）' : '預計請假診數';
+}
+
 function renderSim() {
+  renderSimDays();
   const target = $('simMonth').value;
   if (!/^\d{4}-\d{2}$/.test(target)) { $('simResult').innerHTML = ''; return; }
   const L = Math.max(0, parseInt($('simLeave').value, 10) || 0);
   const assume = $('simAssume').checked;
-  const r = E.simulate(state.schedule, state.months, opt(), target, L, assume, TEMPLATE);
-  const managed = state.months.includes(target);
+  const r = E.simulate(state.schedule, state.months, opt(), target, L, assume, templateFor, simDays);
+  const total = r.lostTotal + L;
+  const lostLines = r.lost.filter(x => x.n).map(x => `${dayLabel(x.date)} ${x.n} 診`).join('、');
+  const what = [lostLines, L ? `另外 ${L} 診（算在${E.mShort(target)}）` : ''].filter(Boolean).join(' ＋ ') || `${E.mLabel(target)}請 0 診`;
+  const dayFillTxt = r.dayFills.map(d => `<li>${range(d.week)} 週缺 ${d.need} 診：${d.fills.map(f => `由 ${E.md(f.s.week.start)} 週補 ${f.n}`).join('、') || '—'}${d.unfilled ? `，<b class="text-red-600">還差 ${d.unfilled}</b>` : ''}</li>`).join('');
   const head = r.need > 0
-    ? `<div class="rounded-xl bg-red-50 border border-red-200 p-4"><p class="text-sm text-red-700">${E.mLabel(target)}請 ${L} 診</p><p class="text-xl font-bold text-red-600 tabnum">還需額外多上 ${r.need} 診</p><p class="text-sm text-red-700 mt-1">該月最多可請 ${r.max} 診而不產生缺口。</p></div>`
-    : `<div class="rounded-xl bg-emerald-50 border border-emerald-200 p-4"><p class="text-sm text-emerald-700">${E.mLabel(target)}請 ${L} 診</p><p class="text-xl font-bold text-emerald-600 tabnum">可完全抵銷，還剩 ${r.left} 診可請</p><p class="text-sm text-emerald-700 mt-1">該月最多可請 ${r.max} 診。</p></div>`;
-  const weeks = r.monthWeeks.map(w => `<li class="flex justify-between tabnum"><span>${range(w)}${w.cross ? ' <span class="text-violet-600">跨月</span>' : ''}${r.added.includes(w.month) ? ' <span class="text-amber-600">推估</span>' : ''}</span><span>${w.actual} 診 <b class="${netCls(w.net)}">${signed(w.net)}</b></span></li>`).join('') || '<li class="text-slate-400">該月尚無週資料（可勾選推估）</li>';
+    ? `<div class="rounded-2xl bg-red-50 border border-red-200 p-4">
+        <p class="text-sm text-red-700">${what}</p>
+        <p class="mt-1 text-sm text-red-700">共少 <b class="text-lg tabnum">${total}</b> 診</p>
+        <p class="text-xl font-bold text-red-600 tabnum">扣掉盈餘後還需補 ${r.need} 診</p>
+        <p class="text-xs text-red-700 mt-1">${E.mShort(target)}在不補診的情況下最多可再請 ${Math.max(0, r.max)} 診。</p></div>`
+    : `<div class="rounded-2xl bg-emerald-50 border border-emerald-200 p-4">
+        <p class="text-sm text-emerald-700">${what}</p>
+        <p class="mt-1 text-sm text-emerald-700">共少 <b class="text-lg tabnum">${total}</b> 診</p>
+        <p class="text-xl font-bold text-emerald-600 tabnum">${total ? '盈餘可完全抵銷，不用補診' : '目前沒有請假'}</p>
+        <p class="text-xs text-emerald-700 mt-1">${E.mShort(target)}還可以再請 <b>${r.left}</b> 診。</p></div>`;
+  const weeks = r.monthWeeks.map(w => `<li class="flex justify-between tabnum"><span>${range(w)}${w.cross ? ' <span class="text-violet-600">跨月</span>' : ''}${r.added.includes(w.month) ? ' <span class="text-sky-600">推估</span>' : ''}</span><span>${w.actual}${w.min !== state.settings.minPerWeek ? '/' + w.min : ''} 診 <b class="${netCls(w.net)}">${signed(w.net)}</b></span></li>`).join('') || '<li class="text-slate-400">該月尚無週資料（可勾選推估）</li>';
   const src = r.sources.map(s => `<li class="flex justify-between tabnum"><span>${range(s.week)} 週（${E.mShort(s.week.month)}${r.added.includes(s.week.month) ? '・推估' : ''}）</span><span><b class="text-emerald-600">+${s.remaining}</b> · 至${expiryLabel(s.expiry)}</span></li>`).join('') || '<li class="text-slate-400">無</li>';
   const fills = r.fills.map(f => `<li>由 ${range(f.s.week)} 週（${E.mShort(f.s.week.month)}）補 ${f.n} 診</li>`).join('');
   $('simResult').innerHTML = `${head}
-    <details class="mt-2 group"><summary class="cursor-pointer text-sm text-blue-700 py-1">查看計算明細 ▾</summary>
+    <details class="mt-2"><summary class="cursor-pointer text-sm text-blue-700 py-1">查看計算明細 ▾</summary>
     <div class="grid gap-3 md:grid-cols-3 mt-2 text-sm">
-      <div class="rounded-xl border border-slate-200 p-3"><p class="font-semibold mb-1">${E.mShort(target)}各週${managed ? '' : (assume ? '（預設班表推估）' : '')}</p><ul class="space-y-0.5">${weeks}</ul></div>
+      <div class="rounded-xl border border-slate-200 p-3"><p class="font-semibold mb-1">${E.mShort(target)}各週（請假後）</p><ul class="space-y-0.5">${weeks}</ul></div>
       <div class="rounded-xl border border-slate-200 p-3"><p class="font-semibold mb-1">可用於${E.mShort(target)}的盈餘（請假前）</p><ul class="space-y-0.5">${src}</ul></div>
-      <div class="rounded-xl border border-slate-200 p-3"><p class="font-semibold mb-1">這次請假的抵銷來源</p><ul class="space-y-0.5">${fills || '<li class="text-slate-400">—</li>'}</ul>
+      <div class="rounded-xl border border-slate-200 p-3"><p class="font-semibold mb-1">這次請假的抵銷來源</p><ul class="space-y-0.5">${dayFillTxt}${fills || (dayFillTxt ? '' : '<li class="text-slate-400">—</li>')}</ul>
         ${r.need > 0 ? `<p class="mt-1 text-red-600">不足 ${r.need} 診</p>` : ''}</div>
     </div>
-    <p class="mt-2 text-xs text-slate-400">假設請假造成的缺口落在${E.mShort(target)}，依「最舊盈餘優先」與其他缺口一起重新配對；${assume ? `未列入計算的月份（${r.added.map(E.mShort).join('、') || '無'}）以每週 10 診推估。` : '未排班月份不推估。'}</p></details>`;
+    <p class="mt-2 text-xs text-slate-400">指定日期依當天班表扣診（已建立的月份看實際班表，未來月份看固定班表）；缺口依「最舊盈餘優先」、前後 ${state.settings.window} 個月內互補。${assume ? `推估月份：${r.added.map(E.mShort).join('、') || '無'}。` : ''}</p></details>`;
 }
 
 // ---------- 逐週明細 ----------
@@ -728,7 +888,7 @@ function renderTimeline(a) {
 function render() {
   const a = E.analyze(state.schedule, state.months, opt(), TODAY);
   const alt = E.analyze(state.schedule, state.months, optFor(!state.settings.holidayMode), TODAY);
-  renderCards(a, alt); renderGrid(); renderHolidays(); renderSim(); renderTimeline(a);
+  renderCards(a, alt); renderGrid(); renderPatterns(); renderHolidays(); renderSim(); renderTimeline(a);
 }
 
 // ---------- 事件：網格 ----------
@@ -737,10 +897,10 @@ $('grid').addEventListener('click', e => {
   if (!b) return;
   if (b.dataset.date) {
     const ds = b.dataset.date, j = +b.dataset.slot;
+    ensureManaged(E.assignMonth(E.mondayOf(E.parse(ds)), opt().crossRule));
     const v = state.schedule[ds] ? [...state.schedule[ds]] : [0, 0, 0];
     v[j] = v[j] ? 0 : 1;
     setDay(ds, v);
-    ensureManaged(E.assignMonth(E.mondayOf(E.parse(ds)), opt().crossRule));
     save(); render();
   } else if (b.dataset.leave) {
     const ds = b.dataset.leave;
@@ -769,11 +929,11 @@ function weeksOwnedByView() {
 }
 $('btnTemplate').onclick = () => {
   const hs = opt().holidays;
-  if (!confirm(`將「一午晚、二早午晚、三早午、五早午晚」套用到歸屬 ${E.mLabel(viewMonth)} 的每一週？（會覆蓋這些週的現有排班${hs ? '；已勾選的國定假日不排診' : ''}）`)) return;
+  if (!confirm(`將「固定班表」套用到歸屬 ${E.mLabel(viewMonth)} 的每一週？（會覆蓋這些週的現有排班${hs ? '；已勾選的國定假日不排診' : ''}）`)) return;
   undoSnap = clone(state.schedule);
   weeksOwnedByView().forEach(mon => {
     for (let i = 0; i < 6; i++) {
-      const d = E.addDays(mon, i), ds = E.ymd(d), t = TEMPLATE[d.getDay()];
+      const d = E.addDays(mon, i), ds = E.ymd(d), t = templateFor(ds);
       setDay(ds, t && !(hs && hs.has(ds)) ? t : null);
     }
   });
@@ -886,7 +1046,7 @@ $('aiStatus').addEventListener('click', e => {
   if (act === 'apply') {
     undoSnap = clone(state.schedule);
     pending.days.forEach(({ date, v }) => { if (slotStr(state.schedule[date]) !== slotStr(v)) setDay(date, v); });
-    ensureManaged(pending.month); save(); render();
+    ensureManaged(pending.month, false); save(); render();
     aiMsg('✅ 已套用。如有錯誤可直接點格子修正，或按「復原上次辨識/套用」。', 'ok');
   } else aiMsg('已放棄這次辨識結果，網格沒有變動。', 'info');
   pending = null;
@@ -954,7 +1114,7 @@ const saveCloud = () => { try { localStorage.setItem(CLOUDSTORE, JSON.stringify(
 const cloudOn = () => !!(cloud.token && cloud.gist);
 const ghHeaders = () => ({ Authorization: 'Bearer ' + cloud.token, Accept: 'application/vnd.github+json' });
 const parseGistId = s => ((s || '').match(/[0-9a-f]{20,40}/i) || [''])[0];
-const payloadOf = s => JSON.stringify({ app: 'pgy-fu', v: 2, schedule: s.schedule, leaves: s.leaves, months: s.months, settings: s.settings, holiOverride: s.holiOverride, customHoli: s.customHoli, stamps: s.stamps });
+const payloadOf = s => JSON.stringify({ app: 'pgy-fu', v: 2, schedule: s.schedule, leaves: s.leaves, months: s.months, settings: s.settings, holiOverride: s.holiOverride, customHoli: s.customHoli, patterns: s.patterns, stamps: s.stamps });
 let syncing = false, again = false, syncTimer = null, lastSyncAt = 0;
 
 function scheduleSync(ms) {
@@ -1071,6 +1231,26 @@ const stepLeave = d => { const el = $('simLeave'); el.value = Math.max(0, Math.m
 $('simMinus').onclick = () => stepLeave(-1);
 $('simPlus').onclick = () => stepLeave(1);
 $('simLeave').addEventListener('focus', e => e.target.select());
+$('simAddDate').onclick = () => {
+  const ds = $('simDate').value;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(ds)) { toast('請先選擇日期'); return; }
+  if (E.parse(ds).getDay() === 0) { toast('週日本來就沒有排診'); return; }
+  if (simDays.find(x => x.date === ds)) { toast('這天已經加入了'); return; }
+  const first = !simDays.length;
+  simDays.push({ date: ds, slots: [1, 1, 1] });
+  simDays.sort((a, b) => (a.date < b.date ? -1 : 1));
+  $('simMonth').value = ds.slice(0, 7);
+  if (first) $('simLeave').value = 0;
+  saveSimDays(); renderSim();
+  const n = plannedDay(ds).filter(Boolean).length;
+  toast(n ? `${dayLabel(ds)} 原本排 ${n} 診` : `${dayLabel(ds)} 當天沒有排診`);
+};
+$('simDays').addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b) return;
+  if (b.dataset.sdel != null) simDays.splice(+b.dataset.sdel, 1);
+  else if (b.dataset.sd != null) { const x = simDays[+b.dataset.sd], j = +b.dataset.ss; x.slots[j] = x.slots[j] ? 0 : 1; }
+  saveSimDays(); renderSim();
+});
 
 // ---------- 書籤 ----------
 const TABKEY = 'pgy_fu_tab';
@@ -1132,7 +1312,7 @@ $('fileImport').addEventListener('change', async e => {
     if (!j.schedule || !Array.isArray(j.months)) throw new Error('格式不符');
     if (!confirm('匯入會覆蓋目前資料，確定？')) return;
     const prev = state, stamps = state.stamps;
-    state = normalize({ version: j.version, schedule: j.schedule, leaves: j.leaves, months: j.months, settings: j.settings, holiOverride: j.holiOverride, customHoli: j.customHoli });
+    state = normalize({ version: j.version, schedule: j.schedule, leaves: j.leaves, months: j.months, settings: j.settings, holiOverride: j.holiOverride, customHoli: j.customHoli, patterns: j.patterns });
     state.stamps = stamps; stampAll(prev);
     save(); fillSettings(); render(); toast('匯入完成');
   } catch (err) { alert('匯入失敗：' + err.message); }
