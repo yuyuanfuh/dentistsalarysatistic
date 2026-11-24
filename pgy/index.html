@@ -302,6 +302,7 @@ if (typeof module !== 'undefined') module.exports = Engine;
       <button id="btnManage" class="px-3 py-1.5 rounded-lg text-sm"></button>
       <div class="w-full sm:w-auto sm:ml-auto flex flex-wrap gap-2">
         <label class="px-3 py-1.5 rounded-lg text-sm bg-blue-600 text-white cursor-pointer hover:bg-blue-700">📷 上傳班表辨識<input id="fileImage" type="file" accept="image/*" class="hidden"></label>
+        <label class="px-3 py-1.5 rounded-lg text-sm border border-blue-200 text-blue-700 cursor-pointer hover:bg-blue-50">📥 匯入月班表檔<input id="fileMonthImport" type="file" accept="application/json,.json" class="hidden"></label>
         <button id="btnTemplate" class="px-3 py-1.5 rounded-lg text-sm border border-blue-200 text-blue-700 hover:bg-blue-50">套用固定班表</button>
         <button id="btnClearMonth" class="px-3 py-1.5 rounded-lg text-sm border border-slate-200 text-slate-600 hover:bg-slate-50">清空本月</button>
         <button id="btnUndo" class="hidden px-3 py-1.5 rounded-lg text-sm border border-amber-300 text-amber-700 bg-amber-50">復原上次辨識/套用</button>
@@ -1391,11 +1392,32 @@ $('btnExport').onclick = () => {
   document.body.appendChild(a); a.click(); a.remove();
   setTimeout(() => URL.revokeObjectURL(a.href), 1000);
 };
-$('fileImport').addEventListener('change', async e => {
-  const f = e.target.files[0]; e.target.value = '';
-  if (!f) return;
+// 月班表檔：只更新該月歸屬的各週（其他月份與設定不動），會留時間戳、自動同步
+function applyMonthPatch(j) {
+  const k = j.month;
+  if (!/^\d{4}-\d{2}$/.test(k || '') || typeof j.days !== 'object') throw new Error('月班表檔格式不符');
+  const dates = [];
+  E.weekMondaysOfMonth(k).forEach(mon => {
+    if (E.assignMonth(mon, state.settings.crossRule) !== k) return;
+    for (let i = 0; i < 6; i++) dates.push(E.ymd(E.addDays(mon, i)));
+  });
+  Object.keys(j.days).forEach(ds => { if (!dates.includes(ds)) dates.push(ds); });
+  const norm = v => (Array.isArray(v) ? v.map(x => (x ? 1 : 0)) : [0, 0, 0]);
+  const changed = dates.filter(ds => slotStr(state.schedule[ds]) !== slotStr(norm(j.days[ds])));
+  const total = Object.values(j.days).reduce((a, v) => a + norm(v).filter(Boolean).length, 0);
+  if (!confirm(`匯入 ${E.mLabel(k)} 班表：共 ${total} 診，會更新 ${changed.length} 天。\n（只改這個月，其他資料不動；可按「復原」）`)) return false;
+  undoSnap = clone(state.schedule);
+  changed.forEach(ds => setDay(ds, norm(j.days[ds])));
+  if (j.leaves) Object.keys(j.leaves).forEach(ds => setLeave(ds, !!j.leaves[ds]));
+  ensureManaged(k, false);
+  viewMonth = k; save(); render(); setTab('grid');
+  toast(`已匯入 ${E.mLabel(k)}（更新 ${changed.length} 天）`);
+  return true;
+}
+async function handleImportFile(f) {
   try {
     const j = JSON.parse(await f.text());
+    if (j.patch === 'month') { applyMonthPatch(j); return; }
     if (!j.schedule || !Array.isArray(j.months)) throw new Error('格式不符');
     if (!confirm('匯入會覆蓋目前資料，確定？')) return;
     const prev = state, stamps = state.stamps;
@@ -1403,7 +1425,9 @@ $('fileImport').addEventListener('change', async e => {
     state.stamps = stamps; stampAll(prev);
     save(); fillSettings(); render(); toast('匯入完成');
   } catch (err) { alert('匯入失敗：' + err.message); }
-});
+}
+$('fileImport').addEventListener('change', e => { const f = e.target.files[0]; e.target.value = ''; if (f) handleImportFile(f); });
+$('fileMonthImport').addEventListener('change', e => { const f = e.target.files[0]; e.target.value = ''; if (f) handleImportFile(f); });
 
 // ---------- PWA ----------
 (function pwa() {
