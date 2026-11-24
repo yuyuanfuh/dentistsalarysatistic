@@ -992,7 +992,7 @@ async function callGemini(b64, prompt, retried) {
   if (!keys.geminiKey) throw new Error('請先在「設定」輸入 Gemini API Key');
   const model = (keys.geminiModel || defaultKeys().geminiModel).replace(/^models\//, '');
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(keys.geminiKey)}`;
-  const r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({
+  const r = await fetch(url, { method: 'POST', signal: aiCtl && aiCtl.signal, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({
     contents: [{ parts: [{ text: prompt }, { inline_data: { mime_type: 'image/jpeg', data: b64 } }] }],
     generationConfig: { temperature: 0, responseMimeType: 'application/json' }
   }) });
@@ -1013,7 +1013,7 @@ async function callGemini(b64, prompt, retried) {
 }
 async function callClaude(b64, prompt) {
   if (!keys.claudeKey) throw new Error('請先在「設定」輸入 Claude API Key');
-  const r = await fetch('https://api.anthropic.com/v1/messages', { method: 'POST', headers: {
+  const r = await fetch('https://api.anthropic.com/v1/messages', { method: 'POST', signal: aiCtl && aiCtl.signal, headers: {
     'content-type': 'application/json', 'x-api-key': keys.claudeKey, 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true'
   }, body: JSON.stringify({ model: keys.claudeModel, max_tokens: 8000, messages: [{ role: 'user', content: [
     { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: b64 } }, { type: 'text', text: prompt }] }] }) });
@@ -1031,6 +1031,8 @@ function parseAI(text) {
   return days.filter(d => /^\d{4}-\d{2}-\d{2}$/.test(d.date || '') && E.parse(d.date).getDay() !== 0)
     .map(d => ({ date: d.date, v: [pick(d, ['early', 'morning', '早']), pick(d, ['noon', 'afternoon', '午']), pick(d, ['night', 'evening', '晚'])].map(Number) }));
 }
+let aiCtl = null;
+document.addEventListener('click', e => { if (e.target.id === 'aiCancel' && aiCtl) aiCtl.abort(); });
 // 辨識結果先預覽、和目前網格逐格比對，按「套用」才寫入
 let pending = null;
 const slotStr = v => (v || [0, 0, 0]).map((x, i) => (x ? SLOTS[i] : '')).join('') || '—';
@@ -1071,17 +1073,30 @@ $('fileImage').addEventListener('change', async e => {
   const file = e.target.files[0]; e.target.value = '';
   if (!file) return;
   const month = viewMonth;
-  aiMsg(`⏳ 正在用 ${keys.provider === 'claude' ? 'Claude' : 'Gemini'} 辨識 ${E.mLabel(month)} 班表…`, 'info');
+  const who = keys.provider === 'claude' ? 'Claude' : 'Gemini', t0 = Date.now(), LIMIT = 120;
+  aiCtl = new AbortController();
+  let timedOut = false;
+  const tick = () => {
+    const sec = Math.round((Date.now() - t0) / 1000);
+    if (sec >= LIMIT) { timedOut = true; aiCtl.abort(); return; }
+    const el = $('aiStatus');
+    if (!el.querySelector('#aiCancel')) aiMsg(`<span id="aiTick"></span> <button id="aiCancel" class="ml-2 px-2 py-0.5 rounded-md border border-blue-300 bg-white text-xs">取消</button><p class="mt-1 text-xs opacity-80">通常 10～40 秒；等待時請不要切到別的 App，iPhone 可能會中斷連線。</p>`, 'info');
+    const tk = $('aiTick'); if (tk) tk.textContent = `⏳ ${who} 正在辨識 ${E.mLabel(month)} 班表… ${sec} 秒`;
+  };
+  tick(); const timer = setInterval(tick, 1000);
   try {
     const b64 = await imageToJpeg(file);
     const prompt = buildPrompt(month);
     const text = keys.provider === 'claude' ? await callClaude(b64, prompt) : await callGemini(b64, prompt);
     const days = parseAI(text);
     if (!days.length) throw new Error('沒有辨識到任何日期');
+    clearInterval(timer);
     showPreview(days, month);
   } catch (err) {
-    aiMsg(`❌ ${err.message}`, 'err');
-  }
+    clearInterval(timer);
+    if (err.name === 'AbortError') aiMsg(timedOut ? `❌ 超過 ${LIMIT} 秒沒有回應，已停止。請檢查網路後再試一次，或把照片裁到只剩班表。` : '已取消辨識。', 'err');
+    else aiMsg(`❌ ${err.message === 'Load failed' || err.message === 'Failed to fetch' ? '連線中斷（可能切到別的 App 或網路不穩），請再試一次' : err.message}`, 'err');
+  } finally { aiCtl = null; }
 });
 
 // ---------- 國定假日 ----------
