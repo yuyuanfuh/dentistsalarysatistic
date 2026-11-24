@@ -502,7 +502,7 @@ const defaultState = () => ({
   holiOverride: {}, customHoli: {}, stamps: {},
   patterns: [{ from: '2026-11-01', days: clone(DEFAULT_PATTERN) }]
 });
-const defaultKeys = () => ({ provider: 'gemini', geminiKey: '', claudeKey: '', geminiModel: 'gemini-2.5-flash', claudeModel: 'claude-sonnet-5-5' });
+const defaultKeys = () => ({ provider: 'gemini', geminiKey: '', claudeKey: '', geminiModel: 'gemini-3.8-flash', claudeModel: 'claude-sonnet-5-5' });
 
 function normalize(s) {
   const d = defaultState();
@@ -521,7 +521,11 @@ function load() {
   } catch (e) {}
   return defaultState();
 }
-function loadKeys() { try { return Object.assign(defaultKeys(), JSON.parse(localStorage.getItem(KEYSTORE)) || {}); } catch (e) { return defaultKeys(); } }
+function loadKeys() {
+  let k; try { k = Object.assign(defaultKeys(), JSON.parse(localStorage.getItem(KEYSTORE)) || {}); } catch (e) { k = defaultKeys(); }
+  if (/^gemini-(1\.|2\.0|2\.5)/.test(k.geminiModel || '')) k.geminiModel = defaultKeys().geminiModel; // 舊模型已停用
+  return k;
+}
 let state = load(), keys = loadKeys(), undoSnap = null;
 const save = () => { try { localStorage.setItem(STORE, JSON.stringify(state)); } catch (e) {} scheduleSync(); };
 
@@ -984,15 +988,27 @@ function buildPrompt(key) {
 {"days":[{"date":"YYYY-MM-DD","early":true,"noon":false,"night":true}]}
 表上沒有出現的日期不要列出；星期日不要列出。`;
 }
-async function callGemini(b64, prompt) {
+async function callGemini(b64, prompt, retried) {
   if (!keys.geminiKey) throw new Error('請先在「設定」輸入 Gemini API Key');
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(keys.geminiModel)}:generateContent?key=${encodeURIComponent(keys.geminiKey)}`;
+  const model = (keys.geminiModel || defaultKeys().geminiModel).replace(/^models\//, '');
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(keys.geminiKey)}`;
   const r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({
     contents: [{ parts: [{ text: prompt }, { inline_data: { mime_type: 'image/jpeg', data: b64 } }] }],
     generationConfig: { temperature: 0, responseMimeType: 'application/json' }
   }) });
-  const j = await r.json();
-  if (!r.ok) throw new Error(j.error?.message || `Gemini 錯誤 ${r.status}`);
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) {
+    const msg = j.error?.message || `Gemini 錯誤 ${r.status}`;
+    // 模型被停用時，Google 會在訊息裡建議新模型名稱：自動改用並重試一次
+    const sug = msg.match(/models\/(gemini-[\w.\-]+)/g);
+    const next = sug && sug.map(x => x.replace('models/', '')).find(m => m !== model);
+    if (!retried && next) {
+      keys.geminiModel = next; saveKeys(); fillSettings();
+      aiMsg(`⏳ ${model} 已停用，自動改用 ${next} 重新辨識…`, 'info');
+      return callGemini(b64, prompt, true);
+    }
+    throw new Error(msg);
+  }
   return (j.candidates?.[0]?.content?.parts || []).map(p => p.text || '').join('');
 }
 async function callClaude(b64, prompt) {
