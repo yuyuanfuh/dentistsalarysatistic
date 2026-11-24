@@ -963,7 +963,7 @@ function aiMsg(html, kind) {
   el.className = 'mx-4 mt-3 rounded-lg px-3 py-2 text-sm ' + ({ info: 'bg-blue-50 text-blue-800', ok: 'bg-emerald-50 text-emerald-800', err: 'bg-red-50 text-red-700' }[kind]);
   el.innerHTML = html;
 }
-function imageToJpeg(file, max = 2000) {
+function imageToJpeg(file, max = 1600) {
   return new Promise((res, rej) => {
     const url = URL.createObjectURL(file), img = new Image();
     img.onload = () => {
@@ -972,7 +972,7 @@ function imageToJpeg(file, max = 2000) {
       c.width = Math.round(img.width * sc); c.height = Math.round(img.height * sc);
       const g = c.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, c.width, c.height); g.drawImage(img, 0, 0, c.width, c.height);
       URL.revokeObjectURL(url);
-      res(c.toDataURL('image/jpeg', 0.92).split(',')[1]);
+      res(c.toDataURL('image/jpeg', 0.85).split(',')[1]);
     };
     img.onerror = () => { URL.revokeObjectURL(url); rej(new Error('無法讀取圖片')); };
     img.src = url;
@@ -988,28 +988,49 @@ function buildPrompt(key) {
 {"days":[{"date":"YYYY-MM-DD","early":true,"noon":false,"night":true}]}
 表上沒有出現的日期不要列出；星期日不要列出。`;
 }
-async function callGemini(b64, prompt, retried) {
+// 用串流（SSE）呼叫：邊思考邊回傳，避免 iPhone Safari 約 60 秒沒收到資料就斷線（Load failed）
+async function callGemini(b64, prompt, retried, noThinkCfg) {
   if (!keys.geminiKey) throw new Error('請先在「設定」輸入 Gemini API Key');
   const model = (keys.geminiModel || defaultKeys().geminiModel).replace(/^models\//, '');
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(keys.geminiKey)}`;
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:streamGenerateContent?alt=sse&key=${encodeURIComponent(keys.geminiKey)}`;
+  const gen = { temperature: 0, responseMimeType: 'application/json' };
+  if (!noThinkCfg) gen.thinkingConfig = { thinkingLevel: 'low', includeThoughts: true };
   const r = await fetch(url, { method: 'POST', signal: aiCtl && aiCtl.signal, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({
     contents: [{ parts: [{ text: prompt }, { inline_data: { mime_type: 'image/jpeg', data: b64 } }] }],
-    generationConfig: { temperature: 0, responseMimeType: 'application/json' }
+    generationConfig: gen
   }) });
-  const j = await r.json().catch(() => ({}));
   if (!r.ok) {
-    const msg = j.error?.message || `Gemini 錯誤 ${r.status}`;
+    const j = await r.json().catch(() => ({}));
+    const msg = (Array.isArray(j) ? j[0] : j).error?.message || `Gemini 錯誤 ${r.status}`;
+    // 舊模型不支援思考設定 → 拿掉設定重試
+    if (!noThinkCfg && /thinking/i.test(msg)) return callGemini(b64, prompt, retried, true);
     // 模型被停用時，Google 會在訊息裡建議新模型名稱：自動改用並重試一次
     const sug = msg.match(/models\/(gemini-[\w.\-]+)/g);
     const next = sug && sug.map(x => x.replace('models/', '')).find(m => m !== model);
     if (!retried && next) {
       keys.geminiModel = next; saveKeys(); fillSettings();
-      aiMsg(`⏳ ${model} 已停用，自動改用 ${next} 重新辨識…`, 'info');
-      return callGemini(b64, prompt, true);
+      return callGemini(b64, prompt, true, noThinkCfg);
     }
     throw new Error(msg);
   }
-  return (j.candidates?.[0]?.content?.parts || []).map(p => p.text || '').join('');
+  const reader = r.body.getReader(), dec = new TextDecoder();
+  let buf = '', out = '', err = '';
+  const eat = line => {
+    if (!line.startsWith('data:')) return;
+    let j; try { j = JSON.parse(line.slice(5)); } catch (e) { return; }
+    if (j.error) err = j.error.message || 'Gemini 錯誤';
+    aiProgress = true;
+    (j.candidates?.[0]?.content?.parts || []).forEach(p => { if (!p.thought && p.text) out += p.text; });
+  };
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buf += dec.decode(value, { stream: true });
+    let i; while ((i = buf.indexOf('\n')) >= 0) { eat(buf.slice(0, i).trim()); buf = buf.slice(i + 1); }
+  }
+  eat(buf.trim());
+  if (err && !out) throw new Error(err);
+  return out;
 }
 async function callClaude(b64, prompt) {
   if (!keys.claudeKey) throw new Error('請先在「設定」輸入 Claude API Key');
@@ -1031,7 +1052,7 @@ function parseAI(text) {
   return days.filter(d => /^\d{4}-\d{2}-\d{2}$/.test(d.date || '') && E.parse(d.date).getDay() !== 0)
     .map(d => ({ date: d.date, v: [pick(d, ['early', 'morning', '早']), pick(d, ['noon', 'afternoon', '午']), pick(d, ['night', 'evening', '晚'])].map(Number) }));
 }
-let aiCtl = null;
+let aiCtl = null, aiProgress = false;
 document.addEventListener('click', e => { if (e.target.id === 'aiCancel' && aiCtl) aiCtl.abort(); });
 // 辨識結果先預覽、和目前網格逐格比對，按「套用」才寫入
 let pending = null;
@@ -1074,14 +1095,14 @@ $('fileImage').addEventListener('change', async e => {
   if (!file) return;
   const month = viewMonth;
   const who = keys.provider === 'claude' ? 'Claude' : 'Gemini', t0 = Date.now(), LIMIT = 120;
-  aiCtl = new AbortController();
+  aiCtl = new AbortController(); aiProgress = false;
   let timedOut = false;
   const tick = () => {
     const sec = Math.round((Date.now() - t0) / 1000);
     if (sec >= LIMIT) { timedOut = true; aiCtl.abort(); return; }
     const el = $('aiStatus');
     if (!el.querySelector('#aiCancel')) aiMsg(`<span id="aiTick"></span> <button id="aiCancel" class="ml-2 px-2 py-0.5 rounded-md border border-blue-300 bg-white text-xs">取消</button><p class="mt-1 text-xs opacity-80">通常 10～40 秒；等待時請不要切到別的 App，iPhone 可能會中斷連線。</p>`, 'info');
-    const tk = $('aiTick'); if (tk) tk.textContent = `⏳ ${who} 正在辨識 ${E.mLabel(month)} 班表… ${sec} 秒`;
+    const tk = $('aiTick'); if (tk) tk.textContent = `⏳ ${who} ${aiProgress ? '已開始回應，整理中' : '正在辨識'} ${E.mLabel(month)} 班表… ${sec} 秒`;
   };
   tick(); const timer = setInterval(tick, 1000);
   try {
