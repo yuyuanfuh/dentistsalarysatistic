@@ -1052,7 +1052,42 @@ function parseAI(text) {
   return days.filter(d => /^\d{4}-\d{2}-\d{2}$/.test(d.date || '') && E.parse(d.date).getDay() !== 0)
     .map(d => ({ date: d.date, v: [pick(d, ['early', 'morning', '早']), pick(d, ['noon', 'afternoon', '午']), pick(d, ['night', 'evening', '晚'])].map(Number) }));
 }
-let aiCtl = null, aiProgress = false;
+let aiCtl = null, aiProgress = false, aiNote = '';
+const isBusy = m => /high demand|overloaded|UNAVAILABLE|RESOURCE_EXHAUSTED|try again later|\b(429|503)\b/i.test(m || '');
+const sleep = ms => new Promise((res, rej) => {
+  const t = setTimeout(res, ms);
+  if (aiCtl) aiCtl.signal.addEventListener('abort', () => { clearTimeout(t); rej(new DOMException('aborted', 'AbortError')); }, { once: true });
+});
+// 找一個可用的替代 Flash 模型（向 Google 查目前帳號可用的模型清單）
+async function altGeminiModel(cur) {
+  try {
+    const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?pageSize=200&key=${encodeURIComponent(keys.geminiKey)}`, { signal: aiCtl && aiCtl.signal });
+    const j = await r.json();
+    const names = (j.models || []).filter(m => (m.supportedGenerationMethods || []).some(x => /generateContent/.test(x)))
+      .map(m => m.name.replace('models/', '')).filter(n => /^gemini-/.test(n) && n !== cur && !/(image|tts|audio|live|embedding|preview-tts)/i.test(n));
+    const ver = n => parseFloat((n.match(/gemini-(\d+(?:\.\d+)?)/) || [0, 0])[1]);
+    const rank = n => (/flash/.test(n) ? 0 : /pro/.test(n) ? 1 : 2) * 1000 - ver(n) * 10 + (/lite/.test(n) ? 1 : 0) + (/preview|exp/.test(n) ? 5 : 0);
+    return names.sort((a, b) => rank(a) - rank(b))[0] || null;
+  } catch (e) { if (e.name === 'AbortError') throw e; return null; }
+}
+// Google 忙碌時：等幾秒重試 2 次，仍失敗就換替代模型再試
+async function geminiRobust(b64, prompt) {
+  const waits = [4000, 10000];
+  for (let i = 0; ; i++) {
+    try { aiNote = i ? `（Google 忙碌，第 ${i} 次重試）` : ''; return await callGemini(b64, prompt); }
+    catch (e) {
+      if (e.name === 'AbortError' || !isBusy(e.message)) throw e;
+      if (i < waits.length) { aiNote = `（Google 忙碌，${waits[i] / 1000} 秒後重試）`; await sleep(waits[i]); continue; }
+      const cur = keys.geminiModel, alt = await altGeminiModel(cur);
+      if (!alt) throw new Error('Google 目前太忙，重試後仍失敗。請過幾分鐘再試，或在設定改用 Claude。');
+      aiNote = `（${cur} 太忙，改用 ${alt}）`;
+      const saved = keys.geminiModel; keys.geminiModel = alt;
+      try { return await callGemini(b64, prompt); }
+      catch (e2) { if (isBusy(e2.message)) throw new Error('Google 目前太忙，換模型也失敗。請過幾分鐘再試，或在設定改用 Claude。'); throw e2; }
+      finally { keys.geminiModel = saved; }
+    }
+  }
+}
 document.addEventListener('click', e => { if (e.target.id === 'aiCancel' && aiCtl) aiCtl.abort(); });
 // 辨識結果先預覽、和目前網格逐格比對，按「套用」才寫入
 let pending = null;
@@ -1094,21 +1129,21 @@ $('fileImage').addEventListener('change', async e => {
   const file = e.target.files[0]; e.target.value = '';
   if (!file) return;
   const month = viewMonth;
-  const who = keys.provider === 'claude' ? 'Claude' : 'Gemini', t0 = Date.now(), LIMIT = 120;
-  aiCtl = new AbortController(); aiProgress = false;
+  const who = keys.provider === 'claude' ? 'Claude' : 'Gemini', t0 = Date.now(), LIMIT = 240;
+  aiCtl = new AbortController(); aiProgress = false; aiNote = '';
   let timedOut = false;
   const tick = () => {
     const sec = Math.round((Date.now() - t0) / 1000);
     if (sec >= LIMIT) { timedOut = true; aiCtl.abort(); return; }
     const el = $('aiStatus');
     if (!el.querySelector('#aiCancel')) aiMsg(`<span id="aiTick"></span> <button id="aiCancel" class="ml-2 px-2 py-0.5 rounded-md border border-blue-300 bg-white text-xs">取消</button><p class="mt-1 text-xs opacity-80">通常 10～40 秒；等待時請不要切到別的 App，iPhone 可能會中斷連線。</p>`, 'info');
-    const tk = $('aiTick'); if (tk) tk.textContent = `⏳ ${who} ${aiProgress ? '已開始回應，整理中' : '正在辨識'} ${E.mLabel(month)} 班表… ${sec} 秒`;
+    const tk = $('aiTick'); if (tk) tk.textContent = `⏳ ${who} ${aiProgress ? '已開始回應，整理中' : '正在辨識'} ${E.mLabel(month)} 班表… ${sec} 秒 ${aiNote}`;
   };
   tick(); const timer = setInterval(tick, 1000);
   try {
     const b64 = await imageToJpeg(file);
     const prompt = buildPrompt(month);
-    const text = keys.provider === 'claude' ? await callClaude(b64, prompt) : await callGemini(b64, prompt);
+    const text = keys.provider === 'claude' ? await callClaude(b64, prompt) : await geminiRobust(b64, prompt);
     const days = parseAI(text);
     if (!days.length) throw new Error('沒有辨識到任何日期');
     clearInterval(timer);
